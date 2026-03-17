@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+
+# Secrets and local config
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+dist/
+*.tsbuildinfo
+
+# mercury-fork specific
+mercury-fork/.nano-pi
+mercury-fork/.nanny
+mercury-fork/.clawsome/
+mercury-fork/bun.lock
+
+# Mercury runtime (keep .mercury/extensions/ — that's source)
+.mercury/global/
+.mercury/*.db
+.mercury/state.db
+.mercury/state.db-shm
+.mercury/state.db-wal
+.mercury/spaces/
+.mercury/.build-context/
+
+# Explicit paths (in case patterns above don't match subdirs)
+mercury-assistant/.mercury/global/
+mercury-assistant/.mercury/spaces/
+mercury-assistant/.mercury/*.db
+mercury-assistant/.mercury/state.db*
+
+# Extension build outputs (keep extension source)
+**/.mercury/extensions/*/dist/
+**/.mercury/extensions/*/node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs and debug
+*.log
+npm-debug.log*
+bun-debug.log*

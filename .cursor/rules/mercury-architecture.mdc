@@ -1,0 +1,35 @@
+---
+description: Mercury framework architecture and key directories
+globs: mercury-fork/**/*.ts
+alwaysApply: false
+---
+
+# Mercury Architecture
+
+For full structure and key files, see [mercury-fork/CLAUDE.md](mercury-fork/CLAUDE.md). Do not duplicate that content here.
+
+## Key Directories
+
+| Dir | Purpose |
+|-----|---------|
+| `core/` | Runtime, handler, router, API routes, permissions, trigger |
+| `agent/` | Docker container spawn, container-entry (calls pi) |
+| `extensions/` | Loader, hooks, jobs, config-registry, skills, image-builder |
+| `bridges/` | PlatformBridge implementations (WhatsApp, Discord, Slack, Teams) |
+| `storage/` | SQLite (db.ts), workspace (memory.ts), pi-auth |
+
+## API Routes
+
+Routes live in `core/routes/*.ts`. Each exports a Hono router. Pattern:
+
+- Use `getApiCtx(c)` and `getAuth(c)` for context
+- Use `checkPerm(c, "permission.name")` for RBAC
+- Return `c.json(...)` for responses
+
+## Extensions
+
+Extensions live in `.mercury/extensions/*/`. See [mercury-fork/docs/extensions.md](mercury-fork/docs/extensions.md) for the full API.
+
+## Do Not Modify Without Understanding
+
+- `resources/skills/` — Built-in pi agent skills (SKILL.md format). Changes affect mrctl commands inside containers.

@@ -1,0 +1,35 @@
+---
+description: Core project commands, safety rules, and conventions for Mercury workspace
+alwaysApply: true
+---
+
+# Mercury Project — Core Rules
+
+## Commands
+
+- `bun run check` — Typecheck + lint + test (run before PR)
+- `bun run check:fix` — Same but auto-fix lint issues
+- `bun test` — Tests only
+- `bun run typecheck` — TypeScript only
+- `bun run lint` — Biome only
+- `mercury service install` — Install and start Mercury as system service
+- `mercury service uninstall` — Stop Mercury cleanly
+- `mercury service status` — Check if running
+- `mercury service logs -f` — Tail logs
+
+## Safety Rules
+
+- **Never kill processes by port** (e.g. `lsof -ti:8787 | xargs kill`). This can kill the agent process itself. Use `mercury service uninstall` to stop Mercury cleanly.
+- **Never run `mercury run` directly** for production — use `mercury service install`. Direct runs block the terminal and don't auto-restart.
+
+## Conventions
+
+- **Commits**: `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`
+- **Branches**: `issue-<num>-<slug>` for GitHub issues
+- **Lint**: Biome (not ESLint)
+- **Config**: All via env vars, parsed in `config.ts`
+
+## Structure
+
+- `mercury-fork/` — Core Mercury framework (TypeScript, Bun, pi runtime)
+- `mercury-assistant/` — Example assistant app

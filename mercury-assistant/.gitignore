@@ -1,0 +1,21 @@
+# Secrets and local config
+.env
+.env.local
+.env.*.local
+
+# Mercury auth (contains tokens)
+.mercury/global/auth.json
+
+# Mercury session data (optional — uncomment if you don't want to track sessions)
+# .mercury/spaces/
+# .mercury/*.db
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

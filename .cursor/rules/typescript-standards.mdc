@@ -1,0 +1,41 @@
+---
+description: TypeScript conventions for Mercury codebase
+globs: "**/*.ts"
+alwaysApply: false
+---
+
+# TypeScript Standards
+
+## Module System
+
+- Use ES modules (`import`/`export`), not CommonJS
+- Use `.js` extension in imports for compiled output: `from "./foo.js"`
+
+## Style
+
+- Functional style; avoid class components
+- Prefer `async`/`await` over raw Promises
+
+## Error Handling
+
+- Use typed errors from `mercury-fork/src/agent/container-error.ts`
+- Log errors with context; avoid empty catch blocks
+
+```typescript
+// BAD
+try { await fetchData(); } catch (e) {}
+
+// GOOD
+try {
+  await fetchData();
+} catch (e) {
+  logger.error("Failed to fetch", { error: e });
+  throw new DataFetchError("Unable to retrieve data", { cause: e });
+}
+```
+
+## Config
+
+- All configuration via env vars
+- Parse with Zod in `mercury-fork/src/config.ts`
+- Never hardcode secrets
