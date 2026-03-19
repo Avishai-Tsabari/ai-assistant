@@ -1,0 +1,9 @@
+Remaining gaps
+Dashboard root routes — GET / and GET /dashboard are not behind auth; only /dashboard/* is. Users can load the HTML shell without a token.
+Permission guard — Still regex-based and bypassable; no change.
+Extension install injection — Install commands still interpolated into Dockerfile; no change.
+DB migrations — No migration system.
+In-memory state — Rate limiter, queue, etc. still in-memory.
+Outbox race — mtime-based scan unchanged.
+Container non-root — Containers still run as root.
+CORS — No CORS configuration.
