@@ -10,6 +10,7 @@ const execFile = promisify(execFileCb);
 const EXT = "voice-transcribe";
 const DEFAULT_MODEL = "mike249/whisper-tiny-he-2";
 const DEFAULT_PROVIDER = "local";
+const DEFAULT_LOCAL_ENGINE = "transformers";
 /** Classic HF Inference API (serverless). */
 const HF_INFERENCE_BASE = "https://api-inference.huggingface.co/models";
 
@@ -85,6 +86,7 @@ async function transcribeWithLocal(
   scriptPath: string,
   audioPath: string,
   modelId: string,
+  localEngine: string,
   pythonBin: string,
   timeoutMs: number,
 ): Promise<string> {
@@ -100,7 +102,15 @@ async function transcribeWithLocal(
   try {
     const { stdout } = await execFile(
       pythonBin,
-      [scriptPath, "--audio", audioPath, "--model", modelId],
+      [
+        scriptPath,
+        "--audio",
+        audioPath,
+        "--model",
+        modelId,
+        "--local-engine",
+        localEngine,
+      ],
       opts,
     );
     const data = parseLastJsonLine(stdout);
@@ -186,6 +196,12 @@ export default function (mercury: {
       "Hugging Face model id (e.g. mike249/whisper-tiny-he-2 for local Hebrew; openai/whisper-large-v3 for api)",
     default: DEFAULT_MODEL,
   });
+  mercury.config("local_engine", {
+    description:
+      'local ASR only: "transformers" (default) or "faster_whisper" (CTranslate2 / Hugging Face CT2 repos, e.g. ivrit-ai/*-ct2)',
+    default: DEFAULT_LOCAL_ENGINE,
+    validate: (v) => v === "transformers" || v === "faster_whisper",
+  });
   mercury.skill("./skill");
 
   mercury.on("before_container", async (event, ctx) => {
@@ -204,6 +220,13 @@ export default function (mercury: {
     const model =
       ctx.db.getSpaceConfig(event.spaceId, `${EXT}.model`)?.trim() ||
       DEFAULT_MODEL;
+    const rawLocalEngine = ctx.db
+      .getSpaceConfig(event.spaceId, `${EXT}.local_engine`)
+      ?.trim();
+    const localEngine =
+      rawLocalEngine === "faster_whisper" || rawLocalEngine === "transformers"
+        ? rawLocalEngine
+        : DEFAULT_LOCAL_ENGINE;
 
     let token: string | undefined;
     if (provider === "api") {
@@ -245,6 +268,7 @@ export default function (mercury: {
             SCRIPT_PATH,
             hostPath,
             model,
+            localEngine,
             pythonBin,
             timeoutMs,
           );

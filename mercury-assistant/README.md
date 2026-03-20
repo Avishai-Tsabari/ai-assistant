@@ -20,7 +20,7 @@ Personal AI assistant powered by [Mercury](https://github.com/Michaelliv/mercury
 
 ## Optional features
 
-By default this project has **no** Mercury extensions. Add capabilities from the dashboard (**Features** tab at `/dashboard`) or with `mercury add …` (e.g. web browsing, knowledge vault). Restart Mercury after install.
+This repo **bundles** two local extensions under `.mercury/extensions/` (**pdf**, **voice-transcribe**). Add more capabilities from the dashboard (**Features** tab at `/dashboard`) or with `mercury add …` (e.g. knowledge vault). Restart Mercury after install or removal.
 
 ## Quick Start
 
@@ -73,10 +73,11 @@ mercury-assistant/
 ├── .env                 # Config & secrets (DO NOT COMMIT)
 ├── .env.example         # Template (safe to commit)
 ├── .mercury/
+│   ├── extensions/      # Bundled: pdf, voice-transcribe (optional Mercury features also via dashboard / mercury add)
 │   └── global/
 │       ├── AGENTS.md    # Main agent instructions
 │       ├── agents/      # Sub-agents (explore, worker)
-│       ├── extensions/  # Subagent extension
+│       ├── extensions/  # Subagent extension (framework)
 │       └── skills/      # Skills (tasks, roles, etc.)
 └── README.md
 ```
@@ -90,6 +91,7 @@ mercury-assistant/
 | `MERCURY_MODEL` | `gemini-2.5-flash` |
 | `MERCURY_AGENT_IMAGE` | `mercury-agent:latest` (local build) |
 | `MERCURY_ENABLE_WHATSAPP` | `true` to use WhatsApp |
+| Voice (voice-transcribe) | See `.env.example` — `MERCURY_VOICE_ASR_DEVICE`, `MERCURY_VOICE_PYTHON` (optional) |
 
 ## Building the Container (First Time)
 
@@ -147,14 +149,15 @@ See `.mercury/global/agents/` (e.g. `explore.md`, `worker.md`). Users can say "U
 
 ```bash
 mercury add @mercuryai/knowledge
-mercury add @mercuryai/web-browser
 mercury extensions list
 ```
 
-**Installed extensions** (in `.mercury/extensions/`):
+**Bundled in this repo** (folders under `.mercury/extensions/`):
 
-- **web-browser** — Web search (Brave API) and pinchtab for browser automation
-- **napkin** — Obsidian vault CLI: search, create, manage notes, daily notes, tasks, tags. Each space gets a `knowledge/` vault. Optional: set `MERCURY_KB_DISTILL_INTERVAL_MS` (e.g. `3600000`) to enable hourly knowledge distillation from conversations.
+- **pdf** — PDF forms, extraction, and helper scripts (see each extension’s `skill/SKILL.md`)
+- **voice-transcribe** — Local Whisper-based transcription; install Python deps from `voice-transcribe/requirements.txt` if you enable it
+
+**Also via registry / dashboard** (not vendored here): e.g. knowledge vault, web-browser, napkin — use `mercury add …` or **Features** in the dashboard. Optional Brave Search: `MERCURY_BRAVE_API_KEY` in `.env.example`.
 
 ## Multiple Agents
 
