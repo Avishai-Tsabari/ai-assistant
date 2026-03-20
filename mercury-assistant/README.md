@@ -18,6 +18,10 @@ Personal AI assistant powered by [Mercury](https://github.com/Michaelliv/mercury
 - **Gemini API key** from [Google AI Studio](https://aistudio.google.com/apikey)
 - **WhatsApp** on your phone (for pairing)
 
+## Optional features
+
+By default this project has **no** Mercury extensions. Add capabilities from the dashboard (**Features** tab at `/dashboard`) or with `mercury add …` (e.g. web browsing, knowledge vault). Restart Mercury after install.
+
 ## Quick Start
 
 ### 1. Ensure Docker is running
@@ -146,6 +150,11 @@ mercury add @mercuryai/knowledge
 mercury add @mercuryai/web-browser
 mercury extensions list
 ```
+
+**Installed extensions** (in `.mercury/extensions/`):
+
+- **web-browser** — Web search (Brave API) and pinchtab for browser automation
+- **napkin** — Obsidian vault CLI: search, create, manage notes, daily notes, tasks, tags. Each space gets a `knowledge/` vault. Optional: set `MERCURY_KB_DISTILL_INTERVAL_MS` (e.g. `3600000`) to enable hourly knowledge distillation from conversations.
 
 ## Multiple Agents
 
