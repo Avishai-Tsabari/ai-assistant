@@ -1,0 +1,12 @@
+---
+description: After milestone-sized work or before pushing main, sync docs/phases.md, docs/decisions.md (if design changed), and mercury-assistant/README.md (if assistant/extensions/env changed). Short bullets only; skip trivial fixes. Not auto-loaded—invoke via @ or when user asks to document a release.
+alwaysApply: false
+---
+
+# Project docs sync
+
+1. **`docs/phases.md`** — dated phase if milestone-sized.
+2. **`docs/decisions.md`** — only for significant design decisions.
+3. **`mercury-assistant/README.md`** — only if assistant behavior, extensions, or setup changed.
+
+Skill with the same workflow: `.cursor/skills/project-docs-sync/SKILL.md`
