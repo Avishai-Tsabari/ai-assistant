@@ -1,0 +1,62 @@
+# identity
+server:
+  port: 3000
+  bot_username: mercury
+
+trigger:
+  patterns: "@Mercury,Mercury,@bishi_assistant_bot,bishi_assistant_bot"
+
+
+# models and their providers
+model:
+  chain:
+    - provider: mistral
+      model: mistral-large-latest
+    - provider: google
+      model: gemini-2.5-flash
+    - provider: groq
+      model: llama-3.3-70b-versatile
+    - provider: openrouter
+      model: meta-llama/llama-3.3-70b-instruct
+
+
+compaction:
+  keep_recent_tokens: 2000 # Use ~4000 for Groq 8b (6k TPM limit) to avoid "Request too large" errors.
+
+# Conditional context: use minimal session for standalone prompts (reduces tokens).
+conditional_context:
+  enabled: true
+  classifier: llm
+
+ingress:
+  whatsapp: false
+  slack: false
+  teams: false
+  discord: false
+  telegram: true
+
+runtime:
+  data_dir: .mercury
+  max_concurrency: 2
+  log_level: info
+
+# ─── Agent Container Image ─────────────────────────────────────────────
+# Presets (from GitHub Container Registry):
+#   ghcr.io/michaelliv/mercury-agent:latest   - Full: Node, Python, Go, git (~2.8GB)
+#   ghcr.io/michaelliv/mercury-agent:minimal  - Lightweight: Bun + pi + browser (~1.9GB)
+# Or build locally: ./container/build.sh all
+# Custom images must have: bun, pi, mrctl
+# See docs/container-lifecycle.md for custom image requirements
+agent:
+  image: mercury-agent:latest
+  container_bwrap_docker_compat: true
+
+permissions:
+  admins: "telegram:1400791156"
+
+
+
+# ─── Container Passthrough ─────────────────────────────────────────────
+# All MERCURY_* vars are passed to containers with prefix stripped.
+# Example: MERCURY_MY_API_KEY=xxx becomes MY_API_KEY=xxx in container
+

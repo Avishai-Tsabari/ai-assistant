@@ -1,0 +1,46 @@
+# Rename to mercury.yaml to use. Secrets stay in .env only.
+# See mercury-fork/docs/configuration.md for precedence (env overrides YAML).
+
+# server:
+#   port: 3000
+#   bot_username: mercury
+
+# model:
+#   chain:
+#     - provider: mistral
+#       model: mistral-large-latest
+#     - provider: google
+#       model: gemini-2.5-flash
+#     - provider: groq
+#       model: llama-3.3-70b-versatile
+#     - provider: openrouter
+#       model: meta-llama/llama-3.3-70b-instruct
+
+# trigger:
+#   patterns: "@Mercury,Mercury,@bishi_assistant_bot,bishi_assistant_bot"
+
+# compaction:
+#   keep_recent_tokens: 2000
+
+# conditional_context:
+#   enabled: true
+#   classifier: llm
+
+# ingress:
+#   whatsapp: false
+#   slack: false
+#   teams: false
+#   discord: false
+#   telegram: true
+
+# runtime:
+#   data_dir: .mercury
+#   max_concurrency: 2
+#   log_level: info
+
+# agent:
+#   image: mercury-agent:latest
+#   container_bwrap_docker_compat: true
+
+# permissions:
+#   admins: "telegram:YOUR_TELEGRAM_USER_ID"
