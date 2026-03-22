@@ -1,0 +1,40 @@
+---
+description: PRD file format for plan -> prd -> execute -> retro workflow
+globs: "**/prds/**/*.md"
+alwaysApply: false
+---
+
+# PRD Format
+
+## Frontmatter (YAML)
+
+Required fields:
+
+- `prd` — string id (e.g. `"01"`)
+- `title` — short name
+- `phase` — number (1, 2, 3)
+- `depends_on` — array of PRD ids (e.g. `["01"]`) or `[]`
+- `estimated_effort` — e.g. `"2 hours"`
+- `status` — one of: `draft` | `approved` | `in-progress` | `done`
+
+## Body Sections
+
+1. **Overview** — One paragraph: outcome and why.
+2. **Tasks** — Numbered or titled tasks. Each task must include:
+   - `##### CREATE|MODIFY|DELETE: path/to/file`
+   - Specification or exact snippet
+   - **Acceptance:** verifiable check
+3. **Execution Log** — Table: Task | Status | Timestamp | Files Touched | Notes
+4. **Acceptance Criteria** — Checklist for the whole PRD
+
+## Task Markers
+
+Use exactly one of:
+
+- `##### CREATE: relative/path`
+- `##### MODIFY: relative/path` (describe insert location and content)
+- `##### DELETE: relative/path` (reason)
+
+## Naming
+
+Sub-PRD files: `prd-NN_slug.md` under `mercury-cloud-console/prds/phase-N_name/`.

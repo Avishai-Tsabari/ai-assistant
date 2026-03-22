@@ -1,0 +1,26 @@
+---
+description: Enforces the /plan -> /prd -> /execute -> /retro workflow for mercury-cloud-console
+globs: mercury-cloud-console/**
+alwaysApply: false
+---
+
+# Mercury Cloud Console — Workflow
+
+## Pipeline
+
+`/plan` → `/prd` → `/execute` → `/retro`. Do not skip phases.
+
+## Rules
+
+1. **No implementation without an approved PRD** — Sub-PRDs in `mercury-cloud-console/prds/<phase>/` must be `status: approved` (or user explicitly approves in chat) before coding.
+2. **PRD location** — `mercury-cloud-console/prds/phase-*/*.md` for sub-PRDs; `mercury-cloud-console/prds/master-plan.md` for architecture and index.
+3. **Task granularity** — Each PRD task must name CREATE / MODIFY / DELETE and the exact file path.
+4. **Execution log** — After implementing tasks, update the PRD **Execution Log** table (task, status, timestamp, files touched, notes).
+5. **Deviation** — If reality does not match the PRD (missing file, wrong API), **stop** and flag; do not improvise without updating the PRD first.
+6. **Retro** — After a phase, write `retrospective.md` in that phase folder and fold learnings into `master-plan.md` or `.cursor/rules/` as needed.
+
+## Skills
+
+- Writing PRDs: `.cursor/skills/prd-write/SKILL.md`
+- Executing PRDs: `.cursor/skills/prd-execute/SKILL.md`
+- Retros: `.cursor/skills/retro/SKILL.md`

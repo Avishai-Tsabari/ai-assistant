@@ -1,0 +1,60 @@
+# Catalog for cloud console billing + provisioning (install via mercury add)
+# Repo path: {repo}#examples/extensions/{slug}
+extensions:
+  - id: napkin
+    display_name: Napkin
+    description: Knowledge base / napkin search integration
+    mercury_add: Michaelliv/mercury#examples/extensions/napkin
+    monthly_price_usd: 5
+    required_env:
+      - MERCURY_NAPKIN_API_KEY
+    model_capabilities: [tools]
+
+  - id: pdf
+    display_name: PDF
+    description: PDF forms and extraction tools
+    mercury_add: Michaelliv/mercury#examples/extensions/pdf
+    monthly_price_usd: 2
+    required_env: []
+    model_capabilities: [tools]
+
+  - id: charts
+    display_name: Charts
+    description: Chart generation CLI
+    mercury_add: Michaelliv/mercury#examples/extensions/charts
+    monthly_price_usd: 1
+    required_env: []
+    model_capabilities: [tools]
+
+  - id: voice-transcribe
+    display_name: Voice transcribe
+    description: Local or API speech-to-text
+    mercury_add: Michaelliv/mercury#examples/extensions/voice-transcribe
+    monthly_price_usd: 3
+    required_env:
+      - MERCURY_HF_TOKEN
+    model_capabilities: []
+
+  - id: voice-synth
+    display_name: Voice synthesis (TTS)
+    description: Google or Azure cloud TTS (English/Hebrew); mrctl tts + optional auto per space
+    mercury_add: Michaelliv/mercury#examples/extensions/voice-synth
+    monthly_price_usd: 2
+    required_env: []
+    model_capabilities: []
+
+  - id: pinchtab
+    display_name: Web browser (Pinchtab)
+    description: Browser automation skill
+    mercury_add: Michaelliv/mercury#examples/extensions/pinchtab
+    monthly_price_usd: 4
+    required_env: []
+    model_capabilities: [tools, vision]
+
+  - id: gws
+    display_name: Google Workspace
+    description: GWS helper extension (example)
+    mercury_add: Michaelliv/mercury#examples/extensions/gws
+    monthly_price_usd: 2
+    required_env: []
+    model_capabilities: [tools]

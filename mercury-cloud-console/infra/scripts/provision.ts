@@ -1,0 +1,218 @@
+#!/usr/bin/env bun
+/**
+ * Provision a Hetzner VPS with cloud-init Mercury agent bootstrap.
+ * Usage: bun run infra/scripts/provision.ts path/to/request.json
+ */
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { randomBytes } from "node:crypto";
+import { z } from "zod";
+import {
+  buildCloudInitUserData,
+  DEFAULT_MERCURY_YAML,
+  toB64,
+} from "../../src/lib/cloud-init";
+import { renderMercuryEnv } from "../../src/lib/env-renderer";
+import { resolveMercuryAdd, loadCatalog } from "../../src/lib/catalog";
+import { createHetznerDnsARecord, HetznerClient } from "../../src/lib/hetzner";
+
+const RequestSchema = z.object({
+  hostname: z.string().min(1).max(63),
+  extensionIds: z.array(z.string()).default([]),
+  secrets: z.object({
+    anthropicApiKey: z.string().min(1),
+    apiSecret: z.string().optional(),
+  }),
+  optionalEnv: z.record(z.string()).optional().default({}),
+});
+
+type AgentsFile = {
+  agents: Array<{
+    hostname: string;
+    serverId: number;
+    ipv4: string;
+    dashboardUrl: string;
+    healthUrl: string;
+    createdAt: string;
+    extensionIds: string[];
+  }>;
+};
+
+function loadAgents(path: string): AgentsFile {
+  if (!existsSync(path)) {
+    return { agents: [] };
+  }
+  return JSON.parse(readFileSync(path, "utf8")) as AgentsFile;
+}
+
+function saveAgents(path: string, data: AgentsFile) {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+}
+
+async function waitForIpv4(
+  client: HetznerClient,
+  serverId: number,
+  maxAttempts = 60,
+  delayMs = 5000,
+): Promise<string> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const { server } = await client.getServer(serverId);
+    const ip = server.public_net?.ipv4?.ip;
+    if (server.status === "running" && ip) return ip;
+    await new Promise((r) => setTimeout(r, delayMs));
+  }
+  throw new Error("Timeout waiting for server IPv4");
+}
+
+async function waitForHealth(
+  baseUrl: string,
+  maxAttempts = 60,
+  delayMs = 10000,
+): Promise<void> {
+  const url = `${baseUrl.replace(/\/$/, "")}/health`;
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (res.ok) {
+        const j = (await res.json()) as { status?: string };
+        if (j.status === "ok") return;
+      }
+    } catch {
+      /* retry */
+    }
+    await new Promise((r) => setTimeout(r, delayMs));
+  }
+  throw new Error(`Timeout waiting for Mercury /health at ${url}`);
+}
+
+async function main() {
+  const jsonPath = process.argv[2];
+  if (!jsonPath) {
+    console.error("Usage: bun run infra/scripts/provision.ts <request.json>");
+    process.exit(1);
+  }
+
+  const token = process.env.HETZNER_API_TOKEN;
+  if (!token) {
+    console.error("Missing HETZNER_API_TOKEN");
+    process.exit(1);
+  }
+
+  const serverType = process.env.HETZNER_SERVER_TYPE ?? "cx22";
+  const image = process.env.HETZNER_IMAGE ?? "ubuntu-24.04";
+  const location = process.env.HETZNER_LOCATION;
+  const sshKeyIds = (process.env.HETZNER_SSH_KEY_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => Number.parseInt(s, 10))
+    .filter((n) => Number.isFinite(n));
+  const dnsZoneId = process.env.HETZNER_DNS_ZONE_ID;
+  const baseDomain = process.env.BASE_DOMAIN;
+  const agentsPath =
+    process.env.AGENTS_JSON_PATH ??
+    join(process.cwd(), "data", "agents.json");
+  const repo = process.env.MERCURY_EXTENSIONS_REPO ?? "Michaelliv/mercury";
+
+  const raw = JSON.parse(readFileSync(jsonPath, "utf8"));
+  const req = RequestSchema.parse(raw);
+
+  const apiSecret =
+    req.secrets.apiSecret && req.secrets.apiSecret.length > 0
+      ? req.secrets.apiSecret
+      : randomBytes(24).toString("hex");
+
+  const optionalLines = Object.entries(req.optionalEnv).map(
+    ([k, v]) => `${k}=${v}`,
+  );
+
+  const envContent = renderMercuryEnv({
+    anthropicApiKey: req.secrets.anthropicApiKey,
+    apiSecret,
+    optionalLines,
+  });
+
+  loadCatalog();
+  const mercuryAddSpecs = req.extensionIds.map((id) =>
+    resolveMercuryAdd(id, repo),
+  );
+
+  const userData = buildCloudInitUserData({
+    envFileB64: toB64(envContent),
+    mercuryYamlB64: toB64(DEFAULT_MERCURY_YAML),
+    mercuryAddSpecs,
+  });
+
+  const client = new HetznerClient(token);
+  const { server } = await client.createServer({
+    name: req.hostname,
+    serverType,
+    image,
+    location: location || undefined,
+    sshKeys: sshKeyIds.length ? sshKeyIds : undefined,
+    userData,
+    labels: { managed_by: "mercury-cloud-console" },
+  });
+
+  const serverId = server.id;
+  console.log(`Created server id=${serverId}, waiting for IPv4...`);
+  const ipv4 = await waitForIpv4(client, serverId);
+  console.log(`Public IPv4: ${ipv4}`);
+
+  if (dnsZoneId) {
+    try {
+      await createHetznerDnsARecord({
+        token,
+        zoneId: dnsZoneId,
+        name: req.hostname,
+        ip: ipv4,
+      });
+      console.log(
+        `DNS A record created: ${req.hostname} -> ${ipv4} (relative to your Hetzner DNS zone).`,
+      );
+    } catch (e) {
+      console.warn("DNS record failed (add manually in Hetzner DNS):", e);
+    }
+  }
+  console.log(
+    `Public URL (until DNS): http://${ipv4}:8787/dashboard` +
+      (baseDomain
+        ? ` — with DNS: https://${req.hostname}.${baseDomain}:8787 (add TLS separately)`
+        : ""),
+  );
+
+  const healthUrl = `http://${ipv4}:8787`;
+  const dashboardUrl = `${healthUrl}/dashboard`;
+
+  const agents = loadAgents(agentsPath);
+  agents.agents.push({
+    hostname: req.hostname,
+    serverId,
+    ipv4,
+    dashboardUrl,
+    healthUrl,
+    createdAt: new Date().toISOString(),
+    extensionIds: req.extensionIds,
+  });
+  saveAgents(agentsPath, agents);
+
+  console.log("\n--- Mercury agent ---");
+  console.log(`Dashboard: ${dashboardUrl}`);
+  console.log(`Health:    ${healthUrl}/health`);
+  console.log(`MERCURY_API_SECRET (save this): ${apiSecret}`);
+  console.log("\nWaiting for Mercury /health (first boot can take several minutes)...");
+
+  try {
+    await waitForHealth(healthUrl, 90, 10000);
+    console.log("Mercury is healthy.");
+  } catch (e) {
+    console.warn(String(e));
+    console.log("Check server cloud-init logs: journalctl -u mercury-agent -f (on the VPS)");
+  }
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

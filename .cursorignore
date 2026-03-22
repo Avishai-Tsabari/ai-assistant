@@ -1,3 +1,11 @@
-**/.env, **/.env.*
-**/credentials.json, **/secrets.json
+# ignore all env files
+**/.env
+**/.env.*
+
+# allow example env file
+!**/.env.example
+
+# ignore credentials and secrets files
+**/credentials.json
+**/secrets.json
 **/*.key, **/*.pem, **/id_rsa

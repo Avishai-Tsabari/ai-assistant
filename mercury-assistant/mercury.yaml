@@ -7,13 +7,15 @@ trigger:
   patterns: "@Mercury,Mercury,@bishi_assistant_bot,bishi_assistant_bot"
 
 
-# models and their providers
+# models and their providers (max 4 legs). All use pi + native provider API keys.
+# Gemini free tier is very low (~5 req/min); if you see 429 RESOURCE_EXHAUSTED, put another
+# provider first in this list or enable billing on the Google AI project.
 model:
   chain:
-    - provider: mistral
-      model: mistral-large-latest
     - provider: google
       model: gemini-2.5-flash
+    - provider: mistral
+      model: mistral-large-latest
     - provider: groq
       model: llama-3.3-70b-versatile
     - provider: openrouter

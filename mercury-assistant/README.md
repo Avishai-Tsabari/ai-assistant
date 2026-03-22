@@ -92,6 +92,7 @@ mercury-assistant/
 | `MERCURY_AGENT_IMAGE` | `mercury-agent:latest` (local build) |
 | `MERCURY_ENABLE_WHATSAPP` | `true` to use WhatsApp |
 | Voice (voice-transcribe) | See `.env.example` — `MERCURY_VOICE_ASR_DEVICE`, `MERCURY_VOICE_PYTHON` (optional) |
+| Cloud TTS (optional **voice-synth** extension) | See `.env.example` — `MERCURY_TTS_PROVIDER`, Azure key/region and/or Google credentials path; use `mrctl tts synthesize` inside the agent |
 
 ## Building the Container (First Time)
 
@@ -156,6 +157,7 @@ mercury extensions list
 
 - **pdf** — PDF forms, extraction, and helper scripts (see each extension’s `skill/SKILL.md`)
 - **voice-transcribe** — Local Whisper-based transcription; install Python deps from `voice-transcribe/requirements.txt` if you enable it
+- **voice-synth** (install from dashboard / `mercury add`) — Google or Azure text-to-speech for English/Hebrew; host-only credentials; optional per-space auto voice via `voice-synth.auto`
 
 **Also via registry / dashboard** (not vendored here): e.g. knowledge vault, web-browser, napkin — use `mercury add …` or **Features** in the dashboard. Optional Brave Search: `MERCURY_BRAVE_API_KEY` in `.env.example`.
 

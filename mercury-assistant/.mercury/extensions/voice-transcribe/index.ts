@@ -82,6 +82,68 @@ function execFileStdout(e: unknown): string {
   return Buffer.isBuffer(v) ? v.toString("utf8") : String(v ?? "");
 }
 
+/** Best-effort parse of `execFile` failures (non-zero exit, timeout kill, etc.). */
+function describeLocalTranscribeExecError(
+  e: unknown,
+  timeoutMs: number,
+): { message: string; meta: Record<string, unknown> } {
+  const fallback = e instanceof Error ? e.message : String(e);
+  if (!e || typeof e !== "object") {
+    return { message: fallback, meta: {} };
+  }
+  const o = e as Record<string, unknown>;
+  const stderr = Buffer.isBuffer(o.stderr)
+    ? o.stderr.toString("utf8")
+    : String(o.stderr ?? "");
+  const stdout = Buffer.isBuffer(o.stdout)
+    ? o.stdout.toString("utf8")
+    : String(o.stdout ?? "");
+  const stderrTail = stderr.trim().slice(-1200);
+  const stdoutTail = stdout.trim().slice(-600);
+  const code =
+    typeof o.code === "number"
+      ? o.code
+      : typeof o.code === "string"
+        ? o.code
+        : undefined;
+  const killed = o.killed === true;
+  const signal = typeof o.signal === "string" ? o.signal : undefined;
+  const errno = e as NodeJS.ErrnoException;
+  const errnoCode = typeof errno.code === "string" ? errno.code : undefined;
+  const msgLower = fallback.toLowerCase();
+
+  const looksTimedOut =
+    killed ||
+    errnoCode === "ETIMEDOUT" ||
+    msgLower.includes("etimedout") ||
+    msgLower.includes("timed out");
+
+  if (looksTimedOut) {
+    return {
+      message: `Local transcribe exceeded timeout (${timeoutMs}ms). First run often downloads the HF model — raise MERCURY_VOICE_TRANSCRIBE_TIMEOUT_MS, warm-cache the model, or use provider=api.`,
+      meta: {
+        reason: "timeout",
+        timeoutMs,
+        signal,
+        stderrTail: stderrTail || undefined,
+        stdoutTail: stdoutTail || undefined,
+      },
+    };
+  }
+
+  return {
+    message: fallback,
+    meta: {
+      reason: "exec_failed",
+      exitCode: typeof code === "number" ? code : undefined,
+      exitCodeString: typeof code === "string" ? code : undefined,
+      signal,
+      stderrTail: stderrTail || undefined,
+      stdoutTail: stdoutTail || undefined,
+    },
+  };
+}
+
 async function transcribeWithLocal(
   scriptPath: string,
   audioPath: string,
@@ -171,6 +233,7 @@ export default function (mercury: {
       ctx: {
         db: { getSpaceConfig: (spaceId: string, key: string) => string | null };
         log: {
+          info: (msg: string, extra?: unknown) => void;
           warn: (msg: string, extra?: unknown) => void;
           error: (msg: string, extra?: unknown) => void;
         };
@@ -264,6 +327,14 @@ export default function (mercury: {
             token as string,
           );
         } else {
+          ctx.log.info("Voice transcription starting (local)", {
+            extension: EXT,
+            path: hostPath,
+            model,
+            localEngine,
+            timeoutMs,
+            pythonBin,
+          });
           text = await transcribeWithLocal(
             SCRIPT_PATH,
             hostPath,
@@ -275,12 +346,29 @@ export default function (mercury: {
         }
         if (text) lines.push(text);
       } catch (e) {
-        ctx.log.error("Voice transcription failed", {
-          extension: EXT,
-          path: hostPath,
-          provider,
-          error: e instanceof Error ? e.message : String(e),
-        });
+        if (provider === "local") {
+          const { message, meta } = describeLocalTranscribeExecError(
+            e,
+            timeoutMs,
+          );
+          ctx.log.error("Voice transcription failed", {
+            extension: EXT,
+            path: hostPath,
+            provider,
+            model,
+            localEngine,
+            error: message,
+            ...meta,
+          });
+        } else {
+          ctx.log.error("Voice transcription failed", {
+            extension: EXT,
+            path: hostPath,
+            provider,
+            model,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
       }
     }
 

@@ -29,6 +29,70 @@ pinchtab &
 
 **That's it.** Refs are stable—you don't need to re-snapshot before every action. Only snapshot when the page changes significantly.
 
+## Mercury / Docker (required)
+
+In the Mercury agent container, `pinchtab &` plus a short `sleep` often races the HTTP bridge: the CLI then hits `127.0.0.1:9867` before the daemon listens (`connection refused`). The host injects `CHROME_BINARY` and `CHROME_FLAGS` (`--no-sandbox` as root). **Always** wait until the port is open and capture daemon logs.
+
+```bash
+pinchtab_ensure() {
+  local bind="${BRIDGE_BIND:-127.0.0.1}"
+  local port="${BRIDGE_PORT:-9867}"
+  local log="${PINCHTAB_LOG:-/tmp/pinchtab.log}"
+  local max_wait="${1:-120}"
+  mkdir -p "$(dirname "$log")" 2>/dev/null || true
+  : >"$log"
+  if [ ! -x "${CHROME_BINARY:-}" ]; then
+    for _c in /usr/local/bin/chromium /usr/bin/chromium; do
+      if [ -x "$_c" ]; then export CHROME_BINARY="$_c"; break; fi
+    done
+  fi
+  if [ ! -x "${CHROME_BINARY:-}" ]; then
+    echo "No executable Chromium (CHROME_BINARY=${CHROME_BINARY:-}; tried /usr/local/bin/chromium, /usr/bin/chromium). Rebuild mercury-agent-ext (restart Mercury)." | tee -a "$log"
+    return 1
+  fi
+  _pinchtab_port_open() { (echo >/dev/tcp/$bind/$port) 2>/dev/null; }
+  if command -v pinchtab >/dev/null 2>&1 && _pinchtab_port_open; then
+    return 0
+  fi
+  pkill -f '[p]inchtab' 2>/dev/null || true
+  nohup pinchtab >>"$log" 2>&1 &
+  local pid=$!
+  sleep 2
+  if ! kill -0 "$pid" 2>/dev/null; then
+    echo "pinchtab exited immediately (pid $pid). Log:" >&2
+    tail -120 "$log" >&2
+    return 1
+  fi
+  local i=0
+  while [ "$i" -lt "$max_wait" ]; do
+    if _pinchtab_port_open; then
+      return 0
+    fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+      echo "pinchtab died during startup. Log:" >&2
+      tail -120 "$log" >&2
+      return 1
+    fi
+    sleep 1
+    i=$((i+1))
+  done
+  echo "pinchtab did not listen on $bind:$port within ${max_wait}s. Log:" >&2
+  tail -120 "$log" >&2
+  return 1
+}
+```
+
+Use it before every navigation/snapshot/text workflow:
+
+```bash
+pinchtab_ensure || { echo "pinchtab failed — see /tmp/pinchtab.log"; exit 1; }
+pinchtab nav "https://example.com"
+sleep 3
+pinchtab text
+```
+
+If `pinchtab_ensure` fails, show the user the tail of `/tmp/pinchtab.log`; do not only increase `sleep` and retry blindly.
+
 ### Recommended Secure Setup
 
 ```bash

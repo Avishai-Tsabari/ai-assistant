@@ -1,0 +1,9 @@
+{
+  "hostname": "mercury-demo-1",
+  "extensionIds": ["napkin", "pdf"],
+  "secrets": {
+    "anthropicApiKey": "REPLACE_ME",
+    "apiSecret": ""
+  },
+  "optionalEnv": {}
+}
