@@ -217,7 +217,7 @@ async function main() {
   console.log("\nWaiting for Mercury /health (first boot can take several minutes)...");
 
   try {
-    await waitForHealth(healthUrl, 90, 10000);
+    await waitForHealth(healthUrl, 120, 10000);
     console.log("Mercury is healthy.");
   } catch (e) {
     console.warn(String(e));
