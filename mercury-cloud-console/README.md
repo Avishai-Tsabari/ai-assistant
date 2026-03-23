@@ -17,7 +17,7 @@ bun install
 
 ## Phase 1 — Provision an agent VPS
 
-1. Copy `.env.example` → `.env` and set `HETZNER_API_TOKEN`, `BASE_DOMAIN`, etc.
+1. Copy `.env.example` → `.env` and set `HETZNER_API_TOKEN`, `HETZNER_SSH_KEY_IDS` (numeric ID from Hetzner Console → Security → SSH Keys), `BASE_DOMAIN`, etc. Use `HETZNER_IMAGE=docker-ce` (Hetzner [Docker CE app](https://docs.hetzner.com/cloud/apps/list/docker-ce/)) so Docker is pre-installed.
 2. Create a provision request JSON (see `infra/example-provision.request.json`).
 3. Run:
 
@@ -32,6 +32,8 @@ bun run health-check
 ```
 
 Set `MERCURY_API_SECRET` on the agent `.env` so the control plane can call `/api/console/*` and the dashboard stays protected.
+
+**Troubleshooting:** On the VPS, `tail -f /var/log/mercury-provision.log` (bootstrap steps) and `journalctl -u mercury-agent -f` (Mercury service). First boot can take 20+ minutes while `docker pull` runs.
 
 ## Phase 2 — Web console
 
