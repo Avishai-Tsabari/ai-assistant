@@ -7,6 +7,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export type AgentEnvInput = {
   anthropicApiKey: string;
   apiSecret: string;
+  agentImage: string;
   /** KEY=value lines for optional extension env */
   optionalLines?: string[];
 };
@@ -22,5 +23,6 @@ export function renderMercuryEnv(input: AgentEnvInput): string {
   return loadEnvTemplate()
     .replace("{{MERCURY_ANTHROPIC_API_KEY}}", input.anthropicApiKey)
     .replace("{{MERCURY_API_SECRET}}", input.apiSecret)
+    .replace("{{MERCURY_AGENT_IMAGE}}", input.agentImage)
     .replace("{{OPTIONAL_ENV_LINES}}", optional);
 }

@@ -9,6 +9,10 @@ export type CloudInitOptions = {
   mercuryYamlB64: string;
   /** Each entry is full `mercury add` source (e.g. Michaelliv/mercury#examples/extensions/napkin) */
   mercuryAddSpecs: string[];
+  /** Full image reference to pull (e.g. ghcr.io/user/mercury-agent:latest) */
+  agentImage: string;
+  /** GHCR credentials for private image pull (omit if image is public) */
+  ghcr?: { username: string; token: string };
 };
 
 export function toB64(s: string): string {
@@ -38,6 +42,10 @@ export function buildCloudInitUserData(opts: CloudInitOptions): string {
   const specsJoined = opts.mercuryAddSpecs.join("\n");
   const specsB64 = toB64(specsJoined);
 
+  const dockerLoginBlock = opts.ghcr
+    ? `echo ${shellSingleQuote(opts.ghcr.token)} | docker login ghcr.io -u ${shellSingleQuote(opts.ghcr.username)} --password-stdin`
+    : "";
+
   const bootstrapScript = `#!/bin/bash
 set -euxo pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -47,6 +55,9 @@ apt-get install -y ca-certificates curl git gnupg ufw
 curl -fsSL https://get.docker.com | sh
 useradd -m -s /bin/bash mercury || true
 usermod -aG docker mercury
+
+${dockerLoginBlock}
+docker pull ${shellSingleQuote(opts.agentImage)}
 
 curl -fsSL https://bun.sh/install | sudo -u mercury env BUN_INSTALL=/home/mercury/.bun bash
 
@@ -90,7 +101,7 @@ SupplementaryGroups=docker
 WorkingDirectory=/home/mercury/agent
 Environment=HOME=/home/mercury
 Environment=PATH=/home/mercury/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=/bin/bash -lc 'exec mercury run'
+ExecStart=/home/mercury/.bun/bin/bun run /home/mercury/.bun/bin/mercury run
 Restart=on-failure
 RestartSec=15
 

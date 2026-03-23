@@ -114,6 +114,11 @@ async function main() {
     process.env.AGENTS_JSON_PATH ??
     join(process.cwd(), "data", "agents.json");
   const repo = process.env.MERCURY_EXTENSIONS_REPO ?? "Michaelliv/mercury";
+  const agentImage =
+    process.env.MERCURY_AGENT_IMAGE ??
+    "ghcr.io/michaelliv/mercury-agent:latest";
+  const ghcrToken = process.env.GHCR_TOKEN;
+  const ghcrUsername = process.env.GHCR_USERNAME;
 
   const raw = JSON.parse(readFileSync(jsonPath, "utf8"));
   const req = RequestSchema.parse(raw);
@@ -130,6 +135,7 @@ async function main() {
   const envContent = renderMercuryEnv({
     anthropicApiKey: req.secrets.anthropicApiKey,
     apiSecret,
+    agentImage,
     optionalLines,
   });
 
@@ -138,10 +144,17 @@ async function main() {
     resolveMercuryAdd(id, repo),
   );
 
+  const ghcr =
+    ghcrToken && ghcrUsername
+      ? { username: ghcrUsername, token: ghcrToken }
+      : undefined;
+
   const userData = buildCloudInitUserData({
     envFileB64: toB64(envContent),
     mercuryYamlB64: toB64(DEFAULT_MERCURY_YAML),
     mercuryAddSpecs,
+    agentImage,
+    ghcr,
   });
 
   const client = new HetznerClient(token);
