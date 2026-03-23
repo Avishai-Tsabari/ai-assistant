@@ -85,8 +85,13 @@ if ! nice -n 19 ionice -c 3 docker pull ${shellSingleQuote(opts.agentImage)}; th
   fatal "docker pull failed"
 fi
 
-log "bun install for mercury user"
-curl -fsSL https://bun.sh/install | sudo -u mercury env BUN_INSTALL=/home/mercury/.bun bash || fatal "bun install failed"
+log "bun install into /home/mercury/.bun (as root, then chown — avoids sudo|pipe failures in cloud-init)"
+mkdir -p /home/mercury/.bun
+export BUN_INSTALL=/home/mercury/.bun
+if ! curl -fsSL https://bun.sh/install | bash; then
+  fatal "bun install failed"
+fi
+chown -R mercury:mercury /home/mercury/.bun || fatal "chown .bun failed"
 
 sudo -u mercury mkdir -p /home/mercury/agent || fatal "mkdir agent failed"
 
