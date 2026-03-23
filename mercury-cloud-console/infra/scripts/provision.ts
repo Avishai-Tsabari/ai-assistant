@@ -100,7 +100,7 @@ async function main() {
   }
 
   const serverType = process.env.HETZNER_SERVER_TYPE ?? "cx22";
-  const image = process.env.HETZNER_IMAGE ?? "ubuntu-24.04";
+  const image = process.env.HETZNER_IMAGE ?? "docker-ce";
   const location = process.env.HETZNER_LOCATION;
   const sshKeyIds = (process.env.HETZNER_SSH_KEY_IDS ?? "")
     .split(",")
