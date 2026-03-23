@@ -1,6 +1,6 @@
 # identity
 server:
-  port: 3000
+  port: 8787
   bot_username: mercury
 
 trigger:

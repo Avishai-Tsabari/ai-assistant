@@ -39,7 +39,7 @@ Set `MERCURY_API_SECRET` on the agent `.env` so the control plane can call `/api
 bun run dev
 ```
 
-Open http://localhost:3000 — sign in, manage agents (when DB is migrated).
+Open http://localhost:3131 — sign in, manage agents (when DB is migrated).
 
 ## Security
 

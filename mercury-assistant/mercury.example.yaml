@@ -2,7 +2,7 @@
 # See mercury-fork/docs/configuration.md for precedence (env overrides YAML).
 
 # server:
-#   port: 3000
+#   port: 8787
 #   bot_username: mercury
 
 # model:
