@@ -46,11 +46,32 @@ function systemdEnvValue(s: string): string {
 /**
  * Returns full user_data string starting with #cloud-config
  */
+
 /** PATH for `sudo -u mercury` steps — login shells may omit /usr/bin (no `cat`, `git`, etc.). */
 const MERCURY_FULL_PATH =
   "/home/mercury/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 
 export function buildCloudInitUserData(opts: CloudInitOptions): string {
+  const waPatchJs = `import { readFileSync, writeFileSync, existsSync } from "fs";
+const p = "/home/mercury/.bun/install/global/node_modules/mercury-ai/src/adapters/whatsapp.ts";
+if (!existsSync(p)) process.exit(0);
+const old = ${JSON.stringify(`    // Check if WhatsApp credentials exist
+    const credsFile = path.join(this.authDir, "creds.json");
+    if (!fs.existsSync(credsFile)) {
+      throw new Error(
+        "WhatsApp enabled but not authenticated. Run 'mercury auth whatsapp' first.",
+      );
+    }
+
+    await this.connect();`)};
+const neu = ${JSON.stringify(`    // No creds yet: still connect so Baileys can emit a QR (dashboard /auth/whatsapp, or mercury auth whatsapp).
+    await this.connect();`)};
+const t = readFileSync(p, "utf8");
+if (!t.includes(old)) process.exit(0);
+writeFileSync(p, t.replace(old, neu));
+`;
+  const waPatchB64 = toB64(waPatchJs);
+
   const specsJoined = opts.mercuryAddSpecs.join("\n");
   const specsB64 = toB64(specsJoined);
   const agentImageEsc = systemdEnvValue(opts.agentImage);
@@ -123,6 +144,11 @@ ufw --force enable || true
 
 log "mercury-ai global + init"
 sudo -u mercury bash -lc ${shellSingleQuote(`export PATH=${MERCURY_FULL_PATH} && bun install -g mercury-ai@latest`)} || fatal "bun install mercury-ai failed"
+log "patch global mercury-ai WhatsApp adapter (headless first boot until npm ships fix)"
+echo ${shellSingleQuote(waPatchB64)} | base64 -d > /tmp/mercury-wa-patch.mjs
+/home/mercury/.bun/bin/bun /tmp/mercury-wa-patch.mjs || true
+rm -f /tmp/mercury-wa-patch.mjs
+chown -R mercury:mercury /home/mercury/.bun/install/global/node_modules/mercury-ai 2>/dev/null || true
 sudo -u mercury bash -lc ${shellSingleQuote(`export PATH=${MERCURY_FULL_PATH} && cd /home/mercury/agent && mercury init`)} || fatal "mercury init failed"
 
 log "mercury add extensions"
