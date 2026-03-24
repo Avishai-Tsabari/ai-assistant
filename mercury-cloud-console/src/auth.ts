@@ -31,7 +31,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!row) return null;
         const ok = await bcrypt.compare(password, row.passwordHash);
         if (!ok) return null;
-        return { id: row.id, email: row.email };
+        return { id: row.id, email: row.email, role: row.role };
       },
     }),
   ],
@@ -47,6 +47,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.sub = user.id;
         token.email = user.email;
+        token.role = user.role;
       }
       return token;
     },
@@ -54,6 +55,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user && token.sub) {
         session.user.id = token.sub;
         if (token.email) session.user.email = token.email as string;
+        session.user.role = (token.role as string) ?? "user";
       }
       return session;
     },

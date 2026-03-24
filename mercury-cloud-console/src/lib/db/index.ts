@@ -15,6 +15,7 @@ function bootstrap(sqlite: Database.Database) {
       id TEXT PRIMARY KEY NOT NULL,
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'user',
       created_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS agents (
@@ -26,6 +27,7 @@ function bootstrap(sqlite: Database.Database) {
       dashboard_url TEXT,
       health_url TEXT,
       api_secret_cipher TEXT,
+      deprovisioned_at TEXT,
       created_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS subscriptions (
@@ -36,6 +38,20 @@ function bootstrap(sqlite: Database.Database) {
       updated_at TEXT NOT NULL
     );
   `);
+
+  // Migration: add role column to existing users table
+  try {
+    sqlite.exec(`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'`);
+  } catch {
+    // Column already exists — ignore
+  }
+
+  // Migration: add deprovisioned_at column to existing agents table
+  try {
+    sqlite.exec(`ALTER TABLE agents ADD COLUMN deprovisioned_at TEXT`);
+  } catch {
+    // Column already exists — ignore
+  }
 }
 
 let drizzleInstance: ReturnType<typeof drizzle<typeof schema>> | undefined;

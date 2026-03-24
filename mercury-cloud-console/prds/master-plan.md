@@ -194,6 +194,12 @@ mercury-cloud-console/
         â”œâ”€â”€ prd-14_admin-skill.md
         â”œâ”€â”€ prd-15_usage-alerts.md
         â””â”€â”€ retrospective.md
+    â””â”€â”€ phase-4_admin-console/
+        â”œâ”€â”€ prd-16_admin-role-auth-gate.md
+        â”œâ”€â”€ prd-17_users-subscriptions-view.md
+        â”œâ”€â”€ prd-18_agent-overview-health.md
+        â”œâ”€â”€ prd-19_quick-actions.md
+        â””â”€â”€ retrospective.md
 ```
 
 The **master-plan.md** (this document) is the main PRD. It contains:
@@ -209,7 +215,7 @@ Sub-PRDs contain exact file changes -- the "how" at task level.
 
 ## Dev Timeline
 
-Target: Phase 1 usable in ~2 weeks, Phase 2 in ~6 weeks, Phase 3 in ~10 weeks.
+Target: Phase 1 usable in ~2 weeks, Phase 2 in ~6 weeks, Phase 3 in ~10 weeks, Phase 4 in ~12 weeks.
 
 ### Phase 1: Manual Onboarding (Weeks 1-2)
 
@@ -259,7 +265,22 @@ Target: Phase 1 usable in ~2 weeks, Phase 2 in ~6 weeks, Phase 3 in ~10 weeks.
 
 **Phase 3 total: ~~23 hours (~~2-3 weeks at part-time)**
 
-**Grand total: ~85 hours across ~10 weeks**
+### Phase 4: Admin Console (Weeks 11-12)
+
+
+| PRD | Title                        | Effort | Depends On    | Target    |
+| --- | ---------------------------- | ------ | ------------- | --------- |
+| 16  | Admin Role & Auth Gate       | 3h     | Phase 3       | Day 1     |
+| 17  | Users & Subscriptions View   | 4h     | 16            | Day 2     |
+| 18  | Agent Overview & Live Health | 5h     | 16, 17        | Day 3-4   |
+| 19  | Quick Actions                | 3h     | 18            | Day 5     |
+| --  | **Integration test**         | 2h     | all           | Day 5-6   |
+| --  | **Phase 4 Retro**            | 1h     | test          | Day 6     |
+
+
+**Phase 4 total: ~18 hours (~1-2 weeks at part-time)**
+
+**Grand total: ~103 hours across ~12 weeks**
 
 ---
 
@@ -485,6 +506,13 @@ Mercury already tracks token usage in SQLite (`token_usage` table with cost, mod
 - Usage alerts and cost controls
 - Extension marketplace for community extensions
 
+### Phase 4: Admin console (weeks 11-12)
+
+- Admin role + auth gate on the control plane
+- Operator dashboard: all users, subscriptions, agent counts
+- Cross-user agent list with live health polling (replaces CLI health-check)
+- Quick actions: agent detail, deprovision workflow (DB-level)
+
 ---
 
 ## Repo Structure
@@ -612,6 +640,23 @@ Planned PRDs (details TBD based on Phase 1 learnings):
 - **PRD-13: Dashboard Enhancements** -- billing panel, API key management in Mercury dashboard
 - **PRD-14: Admin Skill/Extension** -- chat-based management commands via WhatsApp/Telegram
 - **PRD-15: Usage Alerts** -- cost controls and notifications
+
+### Phase 4: Admin Console
+
+Goal: Give the platform operator a web-based admin dashboard to see all users, agents, health status, and perform basic management actions.
+
+```mermaid
+flowchart LR
+    PRD16["PRD-16: Auth Gate"] --> PRD17["PRD-17: Users View"]
+    PRD16 --> PRD18["PRD-18: Agents + Health"]
+    PRD17 --> PRD18
+    PRD18 --> PRD19["PRD-19: Quick Actions"]
+```
+
+- **PRD-16: Admin Role & Auth Gate** -- `role` column on users, admin-only route group, seed script
+- **PRD-17: Users & Subscriptions View** -- admin landing page, users table with subscription status and agent counts
+- **PRD-18: Agent Overview & Live Health** -- cross-user agent list, async health polling via `agent-client.ts`, health-only triage view
+- **PRD-19: Quick Actions** -- agent detail page, deprovision workflow (DB-only, no Hetzner deletion), deprovisioned agent filtering
 
 ---
 

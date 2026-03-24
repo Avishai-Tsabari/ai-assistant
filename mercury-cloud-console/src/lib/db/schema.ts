@@ -6,6 +6,7 @@ export const users = sqliteTable("users", {
     .$defaultFn(() => crypto.randomUUID()),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  role: text("role").notNull().default("user"),
   createdAt: text("created_at").notNull(),
 });
 
@@ -23,6 +24,7 @@ export const agents = sqliteTable("agents", {
   healthUrl: text("health_url"),
   /** AES-GCM ciphertext (hex) of MERCURY_API_SECRET for remote calls */
   apiSecretCipher: text("api_secret_cipher"),
+  deprovisionedAt: text("deprovisioned_at"),
   createdAt: text("created_at").notNull(),
 });
 
