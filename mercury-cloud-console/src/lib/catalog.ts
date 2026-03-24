@@ -49,7 +49,11 @@ export function resolveMercuryAdd(
   if (!repoOverride || repoOverride === "Michaelliv/mercury") {
     return ext.mercury_add;
   }
-  // Replace repo prefix in mercury_add if same layout
-  const rest = ext.mercury_add.replace(/^[^#]+#/, "");
+  const spec = ext.mercury_add;
+  // Catalog uses git:… so published mercury-cli resolves via clone (GitHub shorthand is missing in some releases).
+  if (spec.startsWith("git:")) {
+    return spec.replaceAll("Michaelliv/mercury", repoOverride.replace(/\.git$/, ""));
+  }
+  const rest = spec.replace(/^[^#]+#/, "");
   return `${repoOverride}#${rest}`;
 }

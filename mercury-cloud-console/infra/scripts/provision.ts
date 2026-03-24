@@ -19,6 +19,8 @@ import { createHetznerDnsARecord, HetznerClient } from "../../src/lib/hetzner";
 const RequestSchema = z.object({
   hostname: z.string().min(1).max(63),
   extensionIds: z.array(z.string()).default([]),
+  /** Override MERCURY_EXTENSIONS_REPO for this run (GitHub `owner/repo` with `examples/extensions/` on default branch). */
+  extensionsRepo: z.string().min(1).optional(),
   secrets: z.object({
     anthropicApiKey: z.string().min(1),
     apiSecret: z.string().optional(),
@@ -113,7 +115,6 @@ async function main() {
   const agentsPath =
     process.env.AGENTS_JSON_PATH ??
     join(process.cwd(), "data", "agents.json");
-  const repo = process.env.MERCURY_EXTENSIONS_REPO ?? "Michaelliv/mercury";
   const agentImage =
     process.env.MERCURY_AGENT_IMAGE ??
     "ghcr.io/michaelliv/mercury-agent:latest";
@@ -122,6 +123,11 @@ async function main() {
 
   const raw = JSON.parse(readFileSync(jsonPath, "utf8"));
   const req = RequestSchema.parse(raw);
+
+  const repo =
+    req.extensionsRepo ??
+    process.env.MERCURY_EXTENSIONS_REPO ??
+    "Michaelliv/mercury";
 
   const apiSecret =
     req.secrets.apiSecret && req.secrets.apiSecret.length > 0

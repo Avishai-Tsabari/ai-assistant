@@ -44,6 +44,10 @@ function systemdEnvValue(s: string): string {
 /**
  * Returns full user_data string starting with #cloud-config
  */
+/** PATH for `sudo -u mercury` steps — login shells may omit /usr/bin (no `cat`, `git`, etc.). */
+const MERCURY_FULL_PATH =
+  "/home/mercury/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+
 export function buildCloudInitUserData(opts: CloudInitOptions): string {
   const specsJoined = opts.mercuryAddSpecs.join("\n");
   const specsB64 = toB64(specsJoined);
@@ -62,13 +66,15 @@ log() { echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") $*" | tee -a "$LOG"; }
 fatal() { log "FATAL: $*"; exit 1; }
 
 export DEBIAN_FRONTEND=noninteractive
+# cloud-init runcmd often runs with no HOME; bun's install script uses HOME (set -u).
+export HOME="\${HOME:-/root}"
 log "=== Mercury provision start ==="
 
 log "apt-get update"
 apt-get update -y || fatal "apt-get update failed"
 
 log "apt-get install packages"
-apt-get install -y ca-certificates curl git gnupg ufw util-linux || fatal "apt-get install failed"
+apt-get install -y ca-certificates curl git gnupg ufw util-linux unzip || fatal "apt-get install failed"
 
 log "ensure docker daemon"
 systemctl enable docker 2>/dev/null || true
@@ -85,12 +91,15 @@ if ! nice -n 19 ionice -c 3 docker pull ${shellSingleQuote(opts.agentImage)}; th
   fatal "docker pull failed"
 fi
 
-log "bun install into /home/mercury/.bun (as root, then chown — avoids sudo|pipe failures in cloud-init)"
+log "bun install into /home/mercury/.bun (curl to file + bash — avoids dash pipe/env quirks in cloud-init)"
 mkdir -p /home/mercury/.bun
-export BUN_INSTALL=/home/mercury/.bun
-if ! curl -fsSL https://bun.sh/install | bash; then
+if ! curl -fsSL https://bun.sh/install -o /tmp/bun-install.sh; then
+  fatal "curl bun installer failed"
+fi
+if ! HOME=/root BUN_INSTALL=/home/mercury/.bun bash /tmp/bun-install.sh; then
   fatal "bun install failed"
 fi
+rm -f /tmp/bun-install.sh
 chown -R mercury:mercury /home/mercury/.bun || fatal "chown .bun failed"
 
 sudo -u mercury mkdir -p /home/mercury/agent || fatal "mkdir agent failed"
@@ -111,17 +120,19 @@ ufw allow 8787/tcp
 ufw --force enable || true
 
 log "mercury-ai global + init"
-sudo -u mercury bash -lc 'export PATH=/home/mercury/.bun/bin:\\$PATH && bun install -g mercury-ai@latest' || fatal "bun install mercury-ai failed"
-sudo -u mercury bash -lc 'export PATH=/home/mercury/.bun/bin:\\$PATH && cd /home/mercury/agent && mercury init' || fatal "mercury init failed"
+sudo -u mercury bash -lc ${shellSingleQuote(`export PATH=${MERCURY_FULL_PATH} && bun install -g mercury-ai@latest`)} || fatal "bun install mercury-ai failed"
+sudo -u mercury bash -lc ${shellSingleQuote(`export PATH=${MERCURY_FULL_PATH} && cd /home/mercury/agent && mercury init`)} || fatal "mercury init failed"
 
 log "mercury add extensions"
 echo ${shellSingleQuote(specsB64)} | base64 -d > /tmp/specs_lines.txt
 while IFS= read -r line || [ -n "$line" ]; do
   [ -z "$line" ] && continue
-  spec_q=$(printf %q "$line")
-  sudo -u mercury /bin/bash -c "export PATH=/home/mercury/.bun/bin:\\$PATH; cd /home/mercury/agent && mercury add $spec_q" || fatal "mercury add failed for: $line"
+  printf '%s' "$line" > /tmp/mercury_one_add_spec
+  chown mercury:mercury /tmp/mercury_one_add_spec
+  chmod 600 /tmp/mercury_one_add_spec
+  sudo -u mercury bash -lc ${shellSingleQuote(`export PATH=${MERCURY_FULL_PATH}; cd /home/mercury/agent && mercury add "$(cat /tmp/mercury_one_add_spec)"`)} || fatal "mercury add failed for: $line"
 done < /tmp/specs_lines.txt
-rm -f /tmp/specs_lines.txt
+rm -f /tmp/specs_lines.txt /tmp/mercury_one_add_spec
 
 log "write systemd unit"
 cat >/etc/systemd/system/mercury-agent.service <<'UNIT'
@@ -169,6 +180,7 @@ packages:
   - git
   - gnupg
   - ufw
+  - unzip
 runcmd:
   - |
 ${indented}
