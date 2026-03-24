@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import {
   buildCloudInitUserData,
   DEFAULT_MERCURY_YAML,
@@ -15,9 +16,13 @@ import {
 import { renderMercuryEnv } from "../../src/lib/env-renderer";
 import { resolveMercuryAdd, loadCatalog } from "../../src/lib/catalog";
 import { createHetznerDnsARecord, HetznerClient } from "../../src/lib/hetzner";
+import { getDb, users, agents as agentsTable } from "../../src/lib/db";
+import { encryptSecret } from "../../src/lib/encryption";
 
 const RequestSchema = z.object({
   hostname: z.string().min(1).max(63),
+  /** Email of the console user to link this agent to. */
+  userEmail: z.string().email(),
   extensionIds: z.array(z.string()).default([]),
   /** Override MERCURY_EXTENSIONS_REPO for this run (GitHub `owner/repo` with `examples/extensions/` on default branch). */
   extensionsRepo: z.string().min(1).optional(),
@@ -215,6 +220,41 @@ async function main() {
     extensionIds: req.extensionIds,
   });
   saveAgents(agentsPath, agents);
+
+  // ── Insert into control-plane SQLite DB so the dashboard can show this agent ──
+  const db = getDb();
+  const user = db
+    .select()
+    .from(users)
+    .where(eq(users.email, req.userEmail))
+    .get();
+
+  if (!user) {
+    console.warn(
+      `WARNING: No console user found for ${req.userEmail} — agent saved to JSON but NOT linked in the dashboard DB. Register the user first, then re-run or insert manually.`,
+    );
+  } else {
+    const masterKey = process.env.CONSOLE_ENCRYPTION_MASTER_KEY;
+    const apiSecretCipher =
+      masterKey && masterKey.length > 0
+        ? encryptSecret(apiSecret, masterKey)
+        : null;
+
+    db.insert(agentsTable)
+      .values({
+        userId: user.id,
+        hostname: req.hostname,
+        serverId,
+        ipv4,
+        dashboardUrl,
+        healthUrl,
+        apiSecretCipher,
+        createdAt: new Date().toISOString(),
+      })
+      .run();
+
+    console.log(`Agent linked to user ${req.userEmail} in console DB.`);
+  }
 
   console.log("\n--- Mercury agent ---");
   console.log(`Dashboard: ${dashboardUrl}`);

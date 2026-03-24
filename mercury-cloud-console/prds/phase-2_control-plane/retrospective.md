@@ -15,7 +15,7 @@ Shipped a minimal Next.js 15 control plane: credentials auth, registration API, 
 
 - Google OAuth optional env vars documented but provider not wired (add `Google` provider when keys set).
 - No UI to trigger Hetzner provision yet — still CLI-first.
-- `agents` table not populated by `provision.ts` (JSON registry only); need user id + encrypted secret ingestion.
+- ~~`agents` table not populated by `provision.ts`~~ — **Fixed**: `provision.ts` now takes `userEmail` in the request JSON, looks up the user, and inserts into the `agents` table with encrypted API secret.
 - Stripe webhook does not update `subscriptions` yet.
 
 ## PRD accuracy
