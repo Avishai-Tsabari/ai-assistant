@@ -183,14 +183,7 @@ export class WhatsAppBaileysAdapter
     this.chat = chat;
     logger.info("WhatsApp adapter initialize", { authDir: this.authDir });
 
-    // Check if WhatsApp credentials exist
-    const credsFile = path.join(this.authDir, "creds.json");
-    if (!fs.existsSync(credsFile)) {
-      throw new Error(
-        "WhatsApp enabled but not authenticated. Run 'mercury auth whatsapp' first.",
-      );
-    }
-
+    // No creds yet: still connect so Baileys can emit a QR (dashboard /auth/whatsapp, or mercury auth whatsapp).
     await this.connect();
   }
 

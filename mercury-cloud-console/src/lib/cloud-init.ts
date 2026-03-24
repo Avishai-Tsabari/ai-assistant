@@ -23,11 +23,13 @@ export function toB64(s: string): string {
 export const DEFAULT_MERCURY_YAML = `server:
   port: 8787
 ingress:
-  enable_whatsapp: false
-  enable_discord: false
-  enable_slack: false
-  enable_teams: false
-  enable_telegram: false
+  # Keys must match mercury.yaml schema (whatsapp not enable_whatsapp).
+  # WhatsApp needs no token at boot; pair via /dashboard when ready. Required so Mercury has ≥1 adapter.
+  whatsapp: true
+  discord: false
+  slack: false
+  teams: false
+  telegram: false
 runtime:
   data_dir: .mercury
 `;

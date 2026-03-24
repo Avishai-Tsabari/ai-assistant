@@ -36,6 +36,8 @@ Set `MERCURY_API_SECRET` on the agent `.env` so the control plane can call `/api
 
 **Troubleshooting:** On the VPS, `tail -f /var/log/mercury-provision.log` (bootstrap steps) and `journalctl -u mercury-agent -f` (Mercury service). First boot can take 20+ minutes while `docker pull` runs. If you see `FATAL: bun install failed`, check `/var/log/mercury-provision.log` and `/var/log/cloud-init-output.log`. Cloud-init uses `/bin/sh` (dash): the bootstrap installs `unzip` and runs the Bun installer from a downloaded script (not `curl | bash`) so `BUN_INSTALL` is applied reliably.
 
+If the agent crashes with **No adapters enabled**, the rendered `mercury.yaml` must use real ingress keys (`whatsapp: true`, not `enable_whatsapp`). Provision also sets `MERCURY_ENABLE_WHATSAPP=true` in `.env` so `mercury run` enables WhatsApp without extra tokens; pair via the dashboard when ready. (Older `mercury-ai` builds that refuse to start until `mercury auth whatsapp` need the whatsapp adapter patch from current `mercury-fork`.)
+
 ## Phase 2 — Web console
 
 ```bash
