@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(grep -r \"list.*user\\\\|list.*agent\\\\|all.*user\\\\|all.*agent\" /c/code/agentic/mercury/mercury-cloud-console/src --include=*.ts --include=*.tsx -i)",
+      "Bash(xargs ls:*)",
+      "Bash(npx tsc:*)",
+      "Bash(ls:*)",
+      "Bash(cat /c/code/agentic/mercury/mercury-cloud-console/src/app/api/auth/[...nextauth]/route.ts)",
+      "Bash(cat /c/code/agentic/mercury/mercury-cloud-console/src/app/api/admin/agents/[id]/route.ts)",
+      "Bash(bun -e \":*)",
+      "Bash(cat:*)",
+      "Bash(find /c/code/agentic/mercury/mercury-cloud-console/src/components -name *.tsx -o -name *.ts)",
+      "Bash(bun run:*)"
     ]
   }
 }

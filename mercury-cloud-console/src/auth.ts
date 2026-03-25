@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
@@ -9,6 +10,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   secret: process.env.AUTH_SECRET,
   providers: [
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    }),
     Credentials({
       name: "credentials",
       credentials: {
@@ -28,7 +33,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .where(eq(users.email, email))
           .limit(1)
           .all()[0];
-        if (!row) return null;
+        if (!row || !row.passwordHash) return null;
         const ok = await bcrypt.compare(password, row.passwordHash);
         if (!ok) return null;
         return { id: row.id, email: row.email, role: row.role };
@@ -43,11 +48,38 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     maxAge: 60 * 60 * 24 * 14,
   },
   callbacks: {
+    async signIn({ user, account }) {
+      // Only handle OAuth providers here; Credentials is handled in authorize()
+      if (account?.provider !== "google") return true;
+      const email = user.email?.toLowerCase();
+      if (!email) return false;
+      const db = getDb();
+      const existing = db
+        .select()
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1)
+        .all()[0];
+      if (existing) {
+        // Link to existing account — carry over id and role
+        user.id = existing.id;
+        (user as { role?: string }).role = existing.role;
+      } else {
+        // Create new OAuth-only account (no password)
+        const id = crypto.randomUUID();
+        db.insert(users)
+          .values({ id, email, passwordHash: null, createdAt: new Date().toISOString() })
+          .run();
+        user.id = id;
+        (user as { role?: string }).role = "user";
+      }
+      return true;
+    },
     jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
         token.email = user.email;
-        token.role = user.role;
+        token.role = (user as { role?: string }).role ?? "user";
       }
       return token;
     },

@@ -14,7 +14,7 @@ function bootstrap(sqlite: Database.Database) {
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY NOT NULL,
       email TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
+      password_hash TEXT,
       role TEXT NOT NULL DEFAULT 'user',
       created_at TEXT NOT NULL
     );
@@ -51,6 +51,28 @@ function bootstrap(sqlite: Database.Database) {
     sqlite.exec(`ALTER TABLE agents ADD COLUMN deprovisioned_at TEXT`);
   } catch {
     // Column already exists — ignore
+  }
+
+  // Migration: make password_hash nullable (for OAuth accounts)
+  try {
+    const info = sqlite.prepare("PRAGMA table_info(users)").all() as Array<{ name: string; notnull: number }>;
+    const col = info.find((c) => c.name === "password_hash");
+    if (col && col.notnull === 1) {
+      sqlite.exec(`
+        ALTER TABLE users RENAME TO users_old;
+        CREATE TABLE users (
+          id TEXT PRIMARY KEY NOT NULL,
+          email TEXT NOT NULL UNIQUE,
+          password_hash TEXT,
+          role TEXT NOT NULL DEFAULT 'user',
+          created_at TEXT NOT NULL
+        );
+        INSERT INTO users SELECT id, email, password_hash, role, created_at FROM users_old;
+        DROP TABLE users_old;
+      `);
+    }
+  } catch {
+    // Already nullable or migration failed — ignore
   }
 }
 

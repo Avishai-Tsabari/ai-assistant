@@ -91,7 +91,16 @@ curl -sS "https://api.search.brave.com/res/v1/news/search?q=YOUR+QUERY+HERE&coun
   | jq '.results // [] | .[] | {title, description, url, age}'
 \`\`\`
 
-### Full page reading: pinchtab (Mercury Docker)
+If Brave returns an error (non-zero HTTP status, {"message":...}, or empty web.results), fall back immediately to a pinchtab Google search — do **not** tell the user you cannot search:
+
+\`\`\`bash
+pinchtab_ensure || { echo "pinchtab failed — see /tmp/pinchtab.log"; exit 1; }
+pinchtab nav "https://www.google.com/search?q=YOUR+QUERY+HERE"
+sleep 3
+pinchtab text
+\`\`\`
+
+### Search fallback & full page reading: pinchtab (Mercury Docker)
 **Always** call \`pinchtab_ensure\` before \`pinchtab nav\`, \`pinchtab snap\`, \`pinchtab text\`, etc. The host sets \`CHROME_BINARY\` (default \`/usr/local/bin/chromium\`, matching the Mercury agent base image) and \`CHROME_FLAGS\` (\`--no-sandbox\` as root in Docker). If that path is missing, \`pinchtab_ensure\` falls back to \`/usr/bin/chromium\`. A fixed \`sleep 5\` after \`pinchtab &\` is unreliable — the bridge may not be listening yet, which causes \`connection refused\` on port 9867.
 
 Define once per shell session (or source the same block):
@@ -100,7 +109,16 @@ Define once per shell session (or source the same block):
 ${pinchtabEnsure}
 \`\`\`
 
-Then every browser workflow starts with:
+To search the web via pinchtab (use when Brave fails):
+
+\`\`\`bash
+pinchtab_ensure || { echo "pinchtab failed — see /tmp/pinchtab.log"; exit 1; }
+pinchtab nav "https://www.google.com/search?q=YOUR+QUERY+HERE"
+sleep 3
+pinchtab text
+\`\`\`
+
+For navigating to a specific page:
 
 \`\`\`bash
 pinchtab_ensure || { echo "pinchtab failed — see /tmp/pinchtab.log"; exit 1; }

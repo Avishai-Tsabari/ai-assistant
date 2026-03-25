@@ -1,7 +1,14 @@
 import { spawnSync } from "node:child_process";
 import { timingSafeEqual } from "node:crypto";
-import { existsSync } from "node:fs";
+import {
+  existsSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
+import path from "node:path";
 import { Hono } from "hono";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import {
   EXTENSION_CATALOG,
   getCatalogEntryByName,
@@ -11,6 +18,101 @@ import {
   removeInstalledExtension,
   resolveExamplesExtensionDir,
 } from "../../extensions/installer.js";
+
+/* ── Adapter configuration helpers ──────────────────────────────── */
+
+/** Which env vars each adapter requires (beyond the enable flag). */
+const ADAPTER_CREDENTIALS: Record<string, string[]> = {
+  whatsapp: [],
+  telegram: ["MERCURY_TELEGRAM_BOT_TOKEN"],
+  discord: ["MERCURY_DISCORD_BOT_TOKEN"],
+  slack: ["MERCURY_SLACK_BOT_TOKEN", "MERCURY_SLACK_SIGNING_SECRET"],
+  teams: ["MERCURY_TEAMS_APP_ID", "MERCURY_TEAMS_APP_PASSWORD"],
+};
+
+const ADAPTER_ENABLE_VARS: Record<string, string> = {
+  whatsapp: "MERCURY_ENABLE_WHATSAPP",
+  telegram: "MERCURY_ENABLE_TELEGRAM",
+  discord: "MERCURY_ENABLE_DISCORD",
+  slack: "MERCURY_ENABLE_SLACK",
+  teams: "MERCURY_ENABLE_TEAMS",
+};
+
+/**
+ * Parse a `.env` file into ordered entries preserving comments and blanks.
+ * Returns an array of `{ key, value, raw }` where key is null for non-KV lines.
+ */
+function parseDotEnv(
+  content: string,
+): { key: string | null; value: string; raw: string }[] {
+  return content.split(/\r?\n/).map((raw) => {
+    const m = raw.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)/);
+    if (!m) return { key: null, value: "", raw };
+    return { key: m[1], value: m[2], raw };
+  });
+}
+
+/**
+ * Update keys in a `.env` file. Keys mapped to `null` are removed.
+ * Writes atomically via tmp+rename.
+ */
+function updateDotEnv(
+  envPath: string,
+  updates: Record<string, string | null>,
+): void {
+  const content = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
+  const entries = parseDotEnv(content);
+  const remaining = { ...updates };
+
+  // Update or remove existing lines
+  const lines: string[] = [];
+  for (const entry of entries) {
+    if (entry.key && entry.key in remaining) {
+      const val = remaining[entry.key];
+      if (val !== null) {
+        lines.push(`${entry.key}=${val}`);
+      }
+      // val === null → skip line (remove)
+      delete remaining[entry.key];
+    } else {
+      lines.push(entry.raw);
+    }
+  }
+
+  // Append new keys
+  for (const [k, v] of Object.entries(remaining)) {
+    if (v !== null) {
+      lines.push(`${k}=${v}`);
+    }
+  }
+
+  const out = lines.join("\n");
+  const tmp = `${envPath}.tmp`;
+  writeFileSync(tmp, out, { mode: 0o600 });
+  renameSync(tmp, envPath);
+}
+
+/**
+ * Update the `ingress` section of a mercury.yaml file.
+ * Creates the file with just the ingress section if it doesn't exist.
+ */
+function updateMercuryYaml(
+  yamlPath: string,
+  ingressUpdate: Record<string, boolean>,
+): void {
+  let doc: Record<string, unknown> = {};
+  if (existsSync(yamlPath)) {
+    const raw = readFileSync(yamlPath, "utf-8");
+    doc = (parseYaml(raw) as Record<string, unknown>) ?? {};
+  }
+  const ingress = (doc.ingress as Record<string, boolean>) ?? {};
+  Object.assign(ingress, ingressUpdate);
+  doc.ingress = ingress;
+  const out = stringifyYaml(doc);
+  const tmp = `${yamlPath}.tmp`;
+  writeFileSync(tmp, out, "utf-8");
+  renameSync(tmp, yamlPath);
+}
 
 function safeCompare(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -117,6 +219,113 @@ export function createConsoleApp(opts: {
       return c.json({ error: result.error }, 400);
     }
     return c.json({ ok: true });
+  });
+
+  /* ── Adapter management ──────────────────────────────────────── */
+
+  /** Return current adapter enable/disable state and credential presence. */
+  app.get("/adapters", (c) => {
+    const adapters: Record<
+      string,
+      { enabled: boolean; credentials: Record<string, boolean> }
+    > = {};
+    for (const [name, creds] of Object.entries(ADAPTER_CREDENTIALS)) {
+      const enableVar = ADAPTER_ENABLE_VARS[name];
+      const enabled =
+        process.env[enableVar]?.toLowerCase() === "true" ||
+        process.env[enableVar] === "1";
+      const credentials: Record<string, boolean> = {};
+      for (const envKey of creds) {
+        credentials[envKey] = !!process.env[envKey];
+      }
+      adapters[name] = { enabled, credentials };
+    }
+    return c.json({ adapters });
+  });
+
+  /**
+   * Configure adapters: update .env + mercury.yaml, then restart.
+   *
+   * Body: `{ adapters: { [name]: { enabled: boolean, env?: Record<string,string> } } }`
+   *
+   * Credentials are only written when provided (non-empty string).
+   * An adapter being disabled removes its enable flag but keeps stored credentials
+   * so re-enabling doesn't require re-entering them.
+   */
+  app.post("/adapters/configure", async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      adapters?: Record<
+        string,
+        { enabled?: boolean; env?: Record<string, string> }
+      >;
+    };
+
+    if (!body.adapters || typeof body.adapters !== "object") {
+      return c.json(
+        { error: "Body must include { adapters: { ... } }" },
+        400,
+      );
+    }
+
+    const envUpdates: Record<string, string | null> = {};
+    const ingressUpdates: Record<string, boolean> = {};
+
+    for (const [name, cfg] of Object.entries(body.adapters)) {
+      if (!(name in ADAPTER_CREDENTIALS)) {
+        return c.json({ error: `Unknown adapter: ${name}` }, 400);
+      }
+
+      const enabled = cfg.enabled === true;
+      const enableVar = ADAPTER_ENABLE_VARS[name];
+      envUpdates[enableVar] = enabled ? "true" : "false";
+      ingressUpdates[name] = enabled;
+
+      // Validate that required credentials are present (either in payload or already in env)
+      if (enabled) {
+        for (const reqVar of ADAPTER_CREDENTIALS[name]) {
+          const inPayload = cfg.env?.[reqVar]?.trim();
+          const inEnv = !!process.env[reqVar];
+          if (!inPayload && !inEnv) {
+            return c.json(
+              {
+                error: `Adapter "${name}" requires ${reqVar} but it is not set`,
+              },
+              400,
+            );
+          }
+        }
+      }
+
+      // Write any credential env vars that were provided
+      if (cfg.env) {
+        for (const [k, v] of Object.entries(cfg.env)) {
+          const trimmed = typeof v === "string" ? v.trim() : "";
+          if (trimmed) {
+            envUpdates[k] = trimmed;
+          }
+          // Empty string → keep existing (don't overwrite)
+        }
+      }
+    }
+
+    try {
+      const envPath = path.join(opts.projectRoot, ".env");
+      updateDotEnv(envPath, envUpdates);
+
+      const yamlPath =
+        path.join(opts.projectRoot, "mercury.yaml");
+      updateMercuryYaml(yamlPath, ingressUpdates);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return c.json({ error: `Failed to write config: ${msg}` }, 500);
+    }
+
+    // Schedule a graceful restart so the response reaches the caller
+    setTimeout(() => {
+      process.kill(process.pid, "SIGTERM");
+    }, 500);
+
+    return c.json({ ok: true, restarting: true });
   });
 
   return app;

@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { AgentsHealthClient } from "./AgentsHealthClient";
+import { ProvisionFormClient } from "./ProvisionFormClient";
 
 type AgentRow = {
   id: string;
@@ -30,6 +31,7 @@ export default function AdminAgentsPage() {
   return (
     <>
       <h2 style={{ marginTop: 0 }}>Agents ({rows.length})</h2>
+      <ProvisionFormClient />
       <AgentsHealthClient agents={rows} />
     </>
   );

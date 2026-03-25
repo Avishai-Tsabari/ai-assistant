@@ -1,0 +1,6 @@
+{
+  "statusLine": {
+    "type": "command",
+    "command": "PYTHONIOENCODING=utf-8 python -u .claude/statusline.py"
+  }
+}

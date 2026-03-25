@@ -59,6 +59,15 @@ export default function SignInPage() {
           {pending ? "…" : "Sign in"}
         </button>
       </form>
+      <div className="muted" style={{ textAlign: "center", margin: "1rem 0" }}>or</div>
+      <button
+        type="button"
+        className="card"
+        style={{ width: "100%", cursor: "pointer" }}
+        onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+      >
+        Continue with Google
+      </button>
       <p className="muted" style={{ marginTop: "1rem" }}>
         <Link href="/">Home</Link> · <Link href="/signup">Sign up</Link>
       </p>
