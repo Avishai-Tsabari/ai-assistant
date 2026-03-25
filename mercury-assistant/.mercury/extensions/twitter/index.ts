@@ -36,18 +36,14 @@ twitter_latest() {
     return 1
   fi
 
-  # Step 2: fetch recent tweets
-  curl -sS "https://api.twitter.com/2/users/$user_id/tweets?max_results=$count&tweet.fields=created_at,text&exclude=retweets,replies" \\
+  # Step 2: fetch recent tweets (API minimum is 5)
+  local fetch_count=$(( count < 5 ? 5 : count ))
+  curl -sS "https://api.twitter.com/2/users/$user_id/tweets?max_results=$fetch_count&tweet.fields=created_at,text&exclude=retweets,replies" \\
     -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" \\
-    | grep -o '"id":"[^"]*"\\|"text":"[^"]*"\\|"created_at":"[^"]*"' \\
-    | paste - - - \\
-    | awk -F'"' '{
-        id=$4; text=$8; date=$12
-        gsub(/T/, " ", date); gsub(/\\.000Z/, "", date)
-        print NR". "text
-        print "   "date"  https://x.com/'$username'/status/"id
-        print ""
-      }'
+    | jq -r --argjson n "$count" '
+        .data[:$n] | to_entries[] |
+        "\\(.key + 1). \\(.value.text)\\n   \\(.value.created_at | gsub("T";" ") | gsub("\\\\.000Z";""))  https://x.com/'$username'/status/\\(.value.id)\\n"
+      '
 }
 \`\`\`
 

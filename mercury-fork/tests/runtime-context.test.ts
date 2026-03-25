@@ -1,43 +1,9 @@
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  mock,
-  spyOn,
-  test,
-} from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { AppConfig } from "../src/config.js";
-import * as compact from "../src/core/compact.js";
 import { MercuryCoreRuntime } from "../src/core/runtime.js";
-
-function writePiSessionJsonl(filePath: string, messageCount: number) {
-  const lines: string[] = [
-    JSON.stringify({
-      type: "session",
-      version: 3,
-      id: "test-id",
-      timestamp: new Date().toISOString(),
-      cwd: "/spaces/test-group",
-    }),
-  ];
-  for (let i = 0; i < messageCount; i++) {
-    lines.push(
-      JSON.stringify({
-        type: "message",
-        id: `msg-${i}`,
-        parentId: i === 0 ? null : `msg-${i - 1}`,
-        timestamp: new Date().toISOString(),
-        message: { role: "user", content: [{ type: "text", text: "hi" }] },
-      }),
-    );
-  }
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, lines.join("\n"));
-}
 
 function baseRuntimeConfig(tempDir: string): AppConfig {
   return {
@@ -66,8 +32,6 @@ function baseRuntimeConfig(tempDir: string): AppConfig {
     globalDir: path.join(tempDir, "global"),
     spacesDir: path.join(tempDir, "spaces"),
     whatsappAuthDir: path.join(tempDir, "whatsapp-auth"),
-    conditionalContextEnabled: true,
-    contextClassifier: "heuristic",
     resolvedModelChain: [
       { provider: "anthropic", model: "claude-sonnet-4-20250514" },
     ],
@@ -85,10 +49,10 @@ function baseRuntimeConfig(tempDir: string): AppConfig {
   } as AppConfig;
 }
 
-describe("Runtime conditional context (reply-to-bot)", () => {
+describe("Runtime sliding window context", () => {
   let tempDir: string;
   let runtime: MercuryCoreRuntime;
-  let lastReplyPayload: { useMinimalContext?: boolean } | undefined;
+  let lastReplyPayload: { messages?: unknown[] } | undefined;
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mercury-ctx-rt-"));
@@ -96,20 +60,10 @@ describe("Runtime conditional context (reply-to-bot)", () => {
     runtime = new MercuryCoreRuntime(baseRuntimeConfig(tempDir));
     runtime.containerRunner.reply = mock(async (input) => {
       lastReplyPayload = input;
-      return {
-        reply: "mocked reply",
-        files: [],
-      };
+      return { reply: "mocked reply", files: [] };
     });
     runtime.db.ensureSpace("test-group");
     runtime.db.setRole("test-group", "admin1", "admin", "test");
-    const sessionPath = path.join(
-      tempDir,
-      "spaces",
-      "test-group",
-      ".mercury.session.jsonl",
-    );
-    writePiSessionJsonl(sessionPath, 2);
   });
 
   afterEach(() => {
@@ -118,160 +72,74 @@ describe("Runtime conditional context (reply-to-bot)", () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  test("reply-to-bot still allows minimal context for standalone prompts", async () => {
-    const msg = {
-      platform: "test",
-      spaceId: "test-group",
-      conversationExternalId: "c1",
-      callerId: "admin1",
-      text: "What is 2+2?",
-      isDM: false,
-      isReplyToBot: true,
-      attachments: [],
-    };
-
-    await runtime.handleRawInput(msg, "chat-sdk");
+  test("passes messages array to containerRunner.reply", async () => {
+    await runtime.handleRawInput(
+      {
+        platform: "test",
+        spaceId: "test-group",
+        conversationExternalId: "c1",
+        callerId: "admin1",
+        text: "@Pi What is 2+2?",
+        isDM: false,
+        isReplyToBot: false,
+        attachments: [],
+      },
+      "chat-sdk",
+    );
 
     expect(runtime.containerRunner.reply).toHaveBeenCalled();
-    expect(lastReplyPayload?.useMinimalContext).toBe(true);
-  });
-});
-
-describe("Runtime auto-compact", () => {
-  describe("when session exceeds threshold", () => {
-    let tempDir: string;
-    let runtime: MercuryCoreRuntime;
-    let compactSpy: ReturnType<typeof spyOn>;
-
-    beforeEach(() => {
-      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mercury-autocpt-"));
-      const cfg = {
-        ...baseRuntimeConfig(tempDir),
-        conditionalContextEnabled: false,
-        autoCompactThreshold: 2,
-      } as AppConfig;
-      runtime = new MercuryCoreRuntime(cfg);
-      runtime.containerRunner.reply = mock(async () => ({
-        reply: "ok",
-        files: [],
-      }));
-      runtime.db.ensureSpace("test-group");
-      runtime.db.setRole("test-group", "admin1", "admin", "test");
-      const sessionPath = path.join(
-        tempDir,
-        "spaces",
-        "test-group",
-        ".mercury.session.jsonl",
-      );
-      writePiSessionJsonl(sessionPath, 5);
-
-      compactSpy = spyOn(compact, "compactSession").mockResolvedValue({
-        compacted: true,
-        summary: "s",
-        tokensBefore: 100,
-      });
-    });
-
-    afterEach(() => {
-      compactSpy.mockRestore();
-      runtime.rateLimiter.stopCleanup();
-      runtime.db.close();
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    });
-
-    test("triggers compactSession when session entries exceed threshold", async () => {
-      await runtime.handleRawInput(
-        {
-          platform: "test",
-          spaceId: "test-group",
-          conversationExternalId: "c1",
-          callerId: "admin1",
-          text: "@Pi hello",
-          isDM: false,
-          isReplyToBot: false,
-          attachments: [],
-        },
-        "chat-sdk",
-      );
-
-      await new Promise((r) => setTimeout(r, 50));
-      expect(compactSpy).toHaveBeenCalled();
-    });
+    expect(lastReplyPayload).toBeDefined();
+    expect(Array.isArray(lastReplyPayload?.messages)).toBe(true);
   });
 
-  describe("when session is below threshold", () => {
-    let tempDir: string;
-    let runtime: MercuryCoreRuntime;
-    let compactSpy: ReturnType<typeof spyOn>;
+  test("does not pass useMinimalContext flag", async () => {
+    await runtime.handleRawInput(
+      {
+        platform: "test",
+        spaceId: "test-group",
+        conversationExternalId: "c1",
+        callerId: "admin1",
+        text: "hello",
+        isDM: false,
+        isReplyToBot: true,
+        attachments: [],
+      },
+      "chat-sdk",
+    );
 
-    beforeEach(() => {
-      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mercury-autocpt2-"));
-      const cfg = {
-        ...baseRuntimeConfig(tempDir),
-        conditionalContextEnabled: false,
-        autoCompactThreshold: 10_000,
-      } as AppConfig;
-      runtime = new MercuryCoreRuntime(cfg);
-      runtime.containerRunner.reply = mock(async () => ({
-        reply: "ok",
-        files: [],
-      }));
-      runtime.db.ensureSpace("test-group");
-      runtime.db.setRole("test-group", "admin1", "admin", "test");
-      const sessionPath = path.join(
-        tempDir,
-        "spaces",
-        "test-group",
-        ".mercury.session.jsonl",
-      );
-      writePiSessionJsonl(sessionPath, 5);
-
-      compactSpy = spyOn(compact, "compactSession").mockResolvedValue({
-        compacted: true,
-      });
-    });
-
-    afterEach(() => {
-      compactSpy.mockRestore();
-      runtime.rateLimiter.stopCleanup();
-      runtime.db.close();
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    });
-
-    test("does not call compactSession", async () => {
-      await runtime.handleRawInput(
-        {
-          platform: "test",
-          spaceId: "test-group",
-          conversationExternalId: "c1",
-          callerId: "admin1",
-          text: "@Pi hello",
-          isDM: false,
-          isReplyToBot: false,
-          attachments: [],
-        },
-        "chat-sdk",
-      );
-
-      await new Promise((r) => setTimeout(r, 50));
-      expect(compactSpy).not.toHaveBeenCalled();
-    });
-  });
-});
-
-describe("countSessionEntries", () => {
-  test("returns 0 for missing file", () => {
-    expect(compact.countSessionEntries("/nonexistent/nope.jsonl")).toBe(0);
+    expect(runtime.containerRunner.reply).toHaveBeenCalled();
+    expect(
+      (lastReplyPayload as Record<string, unknown>)?.useMinimalContext,
+    ).toBeUndefined();
   });
 
-  test("counts pi session entries", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mercury-sess-ct-"));
-    try {
-      const p = path.join(dir, ".mercury.session.jsonl");
-      writePiSessionJsonl(p, 3);
-      expect(compact.countSessionEntries(p)).toBeGreaterThanOrEqual(1);
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
+  test("sliding window includes prior messages in chronological order", async () => {
+    // Store a prior turn in the DB
+    runtime.db.addMessage("test-group", "user", "Earlier message");
+    runtime.db.addMessage("test-group", "assistant", "Earlier reply");
+
+    await runtime.handleRawInput(
+      {
+        platform: "test",
+        spaceId: "test-group",
+        conversationExternalId: "c1",
+        callerId: "admin1",
+        text: "@Pi follow-up question",
+        isDM: false,
+        isReplyToBot: false,
+        attachments: [],
+      },
+      "chat-sdk",
+    );
+
+    expect(runtime.containerRunner.reply).toHaveBeenCalled();
+    const msgs = lastReplyPayload?.messages as
+      | Array<{ role: string; content: string }>
+      | undefined;
+    expect(msgs).toBeDefined();
+    // The prior messages should be included
+    const roles = msgs?.map((m) => m.role) ?? [];
+    expect(roles).toContain("user");
+    expect(roles).toContain("assistant");
   });
 });

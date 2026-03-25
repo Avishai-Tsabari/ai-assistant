@@ -23,23 +23,6 @@ export interface MessageAttachment {
   sizeBytes?: number;
 }
 
-/** Persisted on user messages after each agent turn (dashboard diagnostics). */
-export type MessageContextMode = "minimal" | "full";
-
-export type MessageContextReason =
-  | "classifier"
-  | "attachments"
-  /** HTTP /chat with fullContext, or legacy callers that set forceFullContext */
-  | "reply_or_full_api"
-  | "classifier_disabled"
-  | "classifier_failed";
-
-export interface MessageClassifierRunMeta {
-  mode: "heuristic" | "llm" | "off";
-  input?: number;
-  output?: number;
-}
-
 export interface MessageAgentRunMeta {
   inputTokens?: number;
   outputTokens?: number;
@@ -52,9 +35,6 @@ export interface MessageAgentRunMeta {
 }
 
 export interface MessageRunMeta {
-  context: MessageContextMode;
-  contextReason: MessageContextReason;
-  classifier: MessageClassifierRunMeta;
   agent?: MessageAgentRunMeta;
 }
 
@@ -191,11 +171,6 @@ export interface IngressMessage {
   isDM: boolean;
   /** Whether the message is a reply to the bot */
   isReplyToBot: boolean;
-  /**
-   * When true, always load full pi session (e.g. HTTP `/chat` with `fullContext`).
-   * Reply-to-bot no longer implies this; the context classifier decides unless this is set.
-   */
-  forceFullContext?: boolean;
   /** Already-downloaded attachments (local paths) */
   attachments: MessageAttachment[];
   /**

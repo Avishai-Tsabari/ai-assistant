@@ -66,12 +66,6 @@ describe("loadConfig", () => {
     );
   });
 
-  test("MERCURY_AUTO_COMPACT_THRESHOLD", () => {
-    process.env.MERCURY_AUTO_COMPACT_THRESHOLD = "100";
-    const config = loadConfig();
-    expect(config.autoCompactThreshold).toBe(100);
-  });
-
   test("env overrides", () => {
     process.env.MERCURY_TRIGGER_PATTERNS = "@Bot,Bot";
     process.env.MERCURY_TRIGGER_MATCH = "prefix";

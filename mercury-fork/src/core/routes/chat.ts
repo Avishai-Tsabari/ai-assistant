@@ -98,9 +98,6 @@ export function createChatRoute(core: MercuryCoreRuntime): Hono {
       return c.json({ error: "Space not found" }, 404);
     }
 
-    const fullContext =
-      typeof body.fullContext === "boolean" ? body.fullContext : false;
-
     const ingress: IngressMessage = {
       platform: "api",
       spaceId,
@@ -110,7 +107,6 @@ export function createChatRoute(core: MercuryCoreRuntime): Hono {
       text: body.text.trim(),
       isDM: true,
       isReplyToBot: false,
-      forceFullContext: fullContext,
       attachments,
     };
 

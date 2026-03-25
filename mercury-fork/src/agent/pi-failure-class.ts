@@ -33,9 +33,7 @@ export function classifyPiFailure(text: string): PiFailureClass {
     return "fallbackable";
   }
 
-  if (
-    /\b429\b|rate[_\s]+limit/i.test(text)
-  ) {
+  if (/\b429\b|rate[_\s]+limit/i.test(text)) {
     return "fallbackable";
   }
 

@@ -89,24 +89,6 @@ const mercuryFileSchema = z
       .strict()
       .optional(),
 
-    conditional_context: z
-      .object({
-        enabled: z.boolean().optional(),
-        classifier: z.enum(["heuristic", "llm"]).optional(),
-        classifier_provider: z.string().optional(),
-        classifier_model: z.string().optional(),
-      })
-      .strict()
-      .optional(),
-
-    compaction: z
-      .object({
-        keep_recent_tokens: z.number().int().min(1000).max(100_000).optional(),
-        auto_compact_threshold: z.number().int().min(10).max(10_000).optional(),
-      })
-      .strict()
-      .optional(),
-
     agent: z
       .object({
         image: z.string().optional(),
@@ -230,26 +212,6 @@ function flattenMercuryFile(f: MercuryFile): RawMercuryConfigInput {
   if (f.trigger?.patterns != null) o.triggerPatterns = f.trigger.patterns;
   if (f.trigger?.match != null) o.triggerMatch = f.trigger.match;
 
-  if (f.conditional_context?.enabled != null) {
-    o.conditionalContextEnabled = f.conditional_context.enabled;
-  }
-  if (f.conditional_context?.classifier != null) {
-    o.contextClassifier = f.conditional_context.classifier;
-  }
-  if (f.conditional_context?.classifier_provider != null) {
-    o.contextClassifierProvider = f.conditional_context.classifier_provider;
-  }
-  if (f.conditional_context?.classifier_model != null) {
-    o.contextClassifierModel = f.conditional_context.classifier_model;
-  }
-
-  if (f.compaction?.keep_recent_tokens != null) {
-    o.compactKeepRecentTokens = f.compaction.keep_recent_tokens;
-  }
-  if (f.compaction?.auto_compact_threshold != null) {
-    o.autoCompactThreshold = f.compaction.auto_compact_threshold;
-  }
-
   if (f.agent?.image != null) o.agentContainerImage = f.agent.image;
   if (f.agent?.container_timeout_ms != null) {
     o.containerTimeoutMs = f.agent.container_timeout_ms;
@@ -286,12 +248,6 @@ const CAMEL_TO_ENV: Record<string, string> = {
   modelMaxRetriesPerLeg: "MERCURY_MODEL_MAX_RETRIES_PER_LEG",
   modelChainBudgetMs: "MERCURY_MODEL_CHAIN_BUDGET_MS",
   modelCapabilitiesEnv: "MERCURY_MODEL_CAPABILITIES",
-  compactKeepRecentTokens: "MERCURY_COMPACT_KEEP_RECENT_TOKENS",
-  autoCompactThreshold: "MERCURY_AUTO_COMPACT_THRESHOLD",
-  conditionalContextEnabled: "MERCURY_CONDITIONAL_CONTEXT_ENABLED",
-  contextClassifier: "MERCURY_CONTEXT_CLASSIFIER",
-  contextClassifierProvider: "MERCURY_CONTEXT_CLASSIFIER_PROVIDER",
-  contextClassifierModel: "MERCURY_CONTEXT_CLASSIFIER_MODEL",
   triggerPatterns: "MERCURY_TRIGGER_PATTERNS",
   triggerMatch: "MERCURY_TRIGGER_MATCH",
   dataDir: "MERCURY_DATA_DIR",

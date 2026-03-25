@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { MercuryCoreRuntime } from "../src/core/runtime.js";
 
-describe("Runtime compact command (user-facing reply)", () => {
+describe("Runtime compact command", () => {
   let tempDir: string;
   let runtime: MercuryCoreRuntime;
 
@@ -50,22 +50,44 @@ describe("Runtime compact command (user-facing reply)", () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  test("returns generic message when compaction fails (no session file)", async () => {
-    const compactMessage = {
-      platform: "test",
-      spaceId: "test-group",
-      text: "@Pi compact",
-      callerId: "admin1",
-      isDM: false,
-      isReplyToBot: false,
-      attachments: [],
-    };
+  test("compact resets DB boundary and returns Compacted.", async () => {
+    // Add some messages so boundary can be set
+    runtime.db.addMessage("test-group", "user", "hi");
 
-    const result = await runtime.handleRawInput(compactMessage, "chat-sdk");
-    expect(result.type).toBe("command");
-    expect(result.result?.reply).toBe(
-      "Compaction failed. Check server logs for details.",
+    const result = await runtime.handleRawInput(
+      {
+        platform: "test",
+        spaceId: "test-group",
+        text: "@Pi compact",
+        callerId: "admin1",
+        isDM: false,
+        isReplyToBot: false,
+        attachments: [],
+      },
+      "chat-sdk",
     );
-    expect(result.result?.reply).not.toContain("No session file found");
+
+    expect(result.type).toBe("command");
+    expect(result.result?.reply).toBe("Compacted.");
+    // Container runner should NOT be called for a command
+    expect(runtime.containerRunner.reply).not.toHaveBeenCalled();
+  });
+
+  test("compact with no messages still succeeds", async () => {
+    const result = await runtime.handleRawInput(
+      {
+        platform: "test",
+        spaceId: "test-group",
+        text: "@Pi compact",
+        callerId: "admin1",
+        isDM: false,
+        isReplyToBot: false,
+        attachments: [],
+      },
+      "chat-sdk",
+    );
+
+    expect(result.type).toBe("command");
+    expect(result.result?.reply).toBe("Compacted.");
   });
 });

@@ -12,7 +12,6 @@ import {
   permissions,
   prefs,
   roles,
-  session,
   spaces,
   tasks,
   tradestation,
@@ -82,7 +81,6 @@ export function createApiApp(apiCtx: ApiContext): Hono<Env> {
   app.route("/roles", roles);
   app.route("/permissions", permissions);
   app.route("/spaces", spaces);
-  app.route("/session", session);
   app.route("/conversations", conversations);
   app.route("/messages", messages);
   app.route("/mutes", mutes);

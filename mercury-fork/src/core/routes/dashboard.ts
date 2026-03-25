@@ -18,7 +18,6 @@ import type { MercuryExtensionContext } from "../../extensions/types.js";
 import type { MessageRunMeta } from "../../types.js";
 import { parseMuteDuration } from "../mute-duration.js";
 import type { MercuryCoreRuntime } from "../runtime.js";
-import { getSessionContextEstimate } from "../session-context-estimate.js";
 import { loadTriggerConfig } from "../trigger.js";
 import {
   BUILTIN_CONFIG_KEYS,
@@ -165,12 +164,6 @@ export function createDashboardRoutes(ctx: DashboardContext) {
   function formatUserRunMetaHtml(meta: MessageRunMeta | undefined): string {
     if (!meta) return "";
     const parts: string[] = [];
-    parts.push(
-      `<span class="badge">${escapeHtml(`ctx: ${meta.context}`)}</span>`,
-    );
-    parts.push(
-      `<span class="mono muted" title="context reason">${escapeHtml(meta.contextReason)}</span>`,
-    );
     const a = meta.agent;
     if (a) {
       const up =
@@ -182,15 +175,7 @@ export function createDashboardRoutes(ctx: DashboardContext) {
         parts.push(`<span class="mono muted">agent ${escapeHtml(tok)}</span>`);
       }
     }
-    const c = meta.classifier;
-    if (c.mode === "llm" && (c.input != null || c.output != null)) {
-      const up = c.input != null ? `↑${formatTokenCount(c.input)}` : "";
-      const down = c.output != null ? `↓${formatTokenCount(c.output)}` : "";
-      const tok = [up, down].filter(Boolean).join(" ");
-      if (tok) {
-        parts.push(`<span class="mono muted">cls ${escapeHtml(tok)}</span>`);
-      }
-    }
+    if (parts.length === 0) return "";
     return `<div class="message-run-meta" style="font-size:11px;margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;line-height:1.4">${parts.join("")}</div>`;
   }
 
@@ -1031,9 +1016,6 @@ export function createDashboardRoutes(ctx: DashboardContext) {
 
       <div class="panel">
         <div class="panel-header">Recent Messages</div>
-        <p class="muted" style="font-size:12px;margin:0;padding:8px 16px 0;line-height:1.45;border-bottom:1px solid var(--border)">
-          Agent ↑/↓ is the main model run (input reflects loaded session size). Classifier tokens are only the small YES/NO LLM call when <span class="mono">context_classifier: llm</span>.
-        </p>
         <div class="panel-body messages-list">${raw(messagesHtml)}</div>
       </div>
     `);
@@ -1465,31 +1447,6 @@ export function createDashboardRoutes(ctx: DashboardContext) {
       perSpace.length > 0
         ? perSpace
             .map((s) => {
-              const ctxEst = getSessionContextEstimate(core.config, s.spaceId);
-              let estCell = "—";
-              let limitCell = "—";
-              let pctCell = "—";
-              let hintCell = "";
-              if (ctxEst.ok) {
-                estCell = formatTokenCount(ctxEst.estimatedTokens);
-                limitCell =
-                  ctxEst.contextWindow != null
-                    ? formatTokenCount(ctxEst.contextWindow)
-                    : "—";
-                pctCell =
-                  ctxEst.percentUsed != null
-                    ? `${ctxEst.percentUsed.toFixed(1)}%`
-                    : "—";
-                hintCell = ctxEst.shouldCompact
-                  ? '<span style="color: var(--yellow)">Consider compact</span>'
-                  : "";
-              } else if (ctxEst.reason === "no_session_file") {
-                hintCell = '<span class="muted">No session file</span>';
-              } else if (ctxEst.reason === "empty_session") {
-                hintCell = '<span class="muted">Empty session</span>';
-              } else {
-                hintCell = `<span class="muted">${escapeHtml(ctxEst.detail ?? "Session read error")}</span>`;
-              }
               return `
               <tr>
                 <td class="mono">${escapeHtml(s.spaceName)}</td>
@@ -1499,15 +1456,11 @@ export function createDashboardRoutes(ctx: DashboardContext) {
                 <td>${formatCost(s.totalCost)}</td>
                 <td>${s.runCount}</td>
                 <td class="muted">${formatRelativeTime(s.lastUsedAt)}</td>
-                <td>${estCell}</td>
-                <td>${limitCell}</td>
-                <td>${pctCell}</td>
-                <td>${hintCell || "—"}</td>
               </tr>
             `;
             })
             .join("")
-        : '<tr><td colspan="11" class="empty">No usage data yet. Token tracking starts after the next container run.</td></tr>';
+        : '<tr><td colspan="7" class="empty">No usage data yet. Token tracking starts after the next container run.</td></tr>';
 
     c.header("Cache-Control", "no-store");
 
@@ -1518,11 +1471,7 @@ export function createDashboardRoutes(ctx: DashboardContext) {
       <p class="muted" style="margin: -8px 0 16px; font-size: 13px; line-height: 1.5;">
         Figures come from the model runtime (pi JSON output). Token counts are aggregated per Mercury run; multi-step agent turns are summed. Cost is an estimate — use your provider for billing.
       </p>
-      <p class="muted" style="margin: -8px 0 16px; font-size: 13px; line-height: 1.5;">
-        <strong>Session context</strong> (per-space columns below) sums pi’s per-message token estimate over the messages in the current session (after compaction). It is not cumulative billing usage. Percent and “consider compact” use the model’s known context window when available.
-      </p>
-
-      <div class="panel">
+      <div class=”panel”>
         <div class="panel-body stats" style="grid-template-columns: repeat(5, 1fr);">
           <div class="stat">
             <div class="stat-value">${formatTokenCount(totals.totalInputTokens)}</div>
@@ -1559,10 +1508,6 @@ export function createDashboardRoutes(ctx: DashboardContext) {
               <th>Cost</th>
               <th>Runs</th>
               <th>Last Used</th>
-              <th>Est. Context</th>
-              <th>Ctx. Limit</th>
-              <th>Ctx. %</th>
-              <th>Compaction</th>
             </tr>
           </thead>
           <tbody>${raw(rowsHtml)}</tbody>

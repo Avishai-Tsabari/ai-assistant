@@ -79,43 +79,6 @@ const schema = z.object({
    */
   modelCapabilitiesEnv: z.string().optional(),
 
-  // ─── Compaction ─────────────────────────────────────────────────────
-  /** Max recent tokens to keep when compacting. Pi default is 20k; use ~4k for Groq 8b (6k TPM limit). */
-  compactKeepRecentTokens: z.coerce
-    .number()
-    .int()
-    .min(1000)
-    .max(100_000)
-    .optional(),
-  /**
-   * When set (e.g. 50), after each full-session agent run, compact the pi session
-   * if entry count exceeds this value. Minimal-context runs skip auto-compact.
-   */
-  autoCompactThreshold: z.coerce.number().int().min(10).max(10_000).optional(),
-
-  // ─── Conditional Context ────────────────────────────────────────────
-  /** When true, use minimal session for standalone prompts to reduce tokens. */
-  conditionalContextEnabled: booleanFromEnv.default(true),
-  /** Classifier mode: heuristic (no API cost) or llm (higher accuracy). */
-  contextClassifier: z.preprocess(
-    (val) => {
-      if (val == null || val === "") return "heuristic";
-      const s = String(val).split("#")[0].trim();
-      return s || "heuristic";
-    },
-    z.enum(["heuristic", "llm"]),
-  ),
-  /** Provider for LLM classifier (e.g. groq, google). Defaults to modelProvider when unset. */
-  contextClassifierProvider: z
-    .string()
-    .optional()
-    .transform((v) => (v ? v.split("#")[0].trim() || undefined : undefined)),
-  /** Model for LLM classifier (e.g. llama-3.3-70b-versatile, gemini-2.5-flash). Defaults to model when unset. */
-  contextClassifierModel: z
-    .string()
-    .optional()
-    .transform((v) => (v ? v.split("#")[0].trim() || undefined : undefined)),
-
   // ─── Trigger Behavior ───────────────────────────────────────────────
   triggerPatterns: z.string().default("@Pi,Pi"),
   triggerMatch: z.string().default("mention"),

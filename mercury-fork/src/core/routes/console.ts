@@ -1,11 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { timingSafeEqual } from "node:crypto";
-import {
-  existsSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { Hono } from "hono";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
@@ -261,10 +256,7 @@ export function createConsoleApp(opts: {
     };
 
     if (!body.adapters || typeof body.adapters !== "object") {
-      return c.json(
-        { error: "Body must include { adapters: { ... } }" },
-        400,
-      );
+      return c.json({ error: "Body must include { adapters: { ... } }" }, 400);
     }
 
     const envUpdates: Record<string, string | null> = {};
@@ -312,8 +304,7 @@ export function createConsoleApp(opts: {
       const envPath = path.join(opts.projectRoot, ".env");
       updateDotEnv(envPath, envUpdates);
 
-      const yamlPath =
-        path.join(opts.projectRoot, "mercury.yaml");
+      const yamlPath = path.join(opts.projectRoot, "mercury.yaml");
       updateMercuryYaml(yamlPath, ingressUpdates);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

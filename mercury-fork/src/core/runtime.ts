@@ -1,5 +1,3 @@
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { ContainerError } from "../agent/container-error.js";
 import { AgentContainerRunner } from "../agent/container-runner.js";
 import { type AppConfig, resolveProjectPath } from "../config.js";
@@ -17,16 +15,10 @@ import type {
   ContainerResult,
   IngressMessage,
   MessageAttachment,
-  MessageContextReason,
   MessageRunMeta,
   MessageSender,
   TokenUsage,
 } from "../types.js";
-import { compactSession, countSessionEntries } from "./compact.js";
-import {
-  type ContextClassificationResult,
-  classifyContextNeeded,
-} from "./context-classifier.js";
 import { hasPermission, resolveRole } from "./permissions.js";
 import { RateLimiter } from "./rate-limiter.js";
 import { type RouteResult, routeInput } from "./router.js";
@@ -55,26 +47,8 @@ function agentMetaFromUsage(
   return a;
 }
 
-function userTurnRunMeta(
-  useMinimalContext: boolean,
-  contextReason: MessageContextReason,
-  classification: ContextClassificationResult,
-  agentUsage?: TokenUsage,
-): MessageRunMeta {
-  const classifier = {
-    mode: classification.classifier.mode,
-    ...(classification.classifier.input != null
-      ? { input: classification.classifier.input }
-      : {}),
-    ...(classification.classifier.output != null
-      ? { output: classification.classifier.output }
-      : {}),
-  };
-  const meta: MessageRunMeta = {
-    context: useMinimalContext ? "minimal" : "full",
-    contextReason,
-    classifier,
-  };
+function userTurnRunMeta(agentUsage?: TokenUsage): MessageRunMeta {
+  const meta: MessageRunMeta = {};
   const agent = agentMetaFromUsage(agentUsage);
   if (agent) meta.agent = agent;
   return meta;
@@ -243,9 +217,6 @@ export class MercuryCoreRuntime {
         message.callerId,
         message.attachments,
         message.authorName,
-        {
-          forceFullSession: message.forceFullContext === true,
-        },
       );
       return { ...route, result };
     } catch (error) {
@@ -311,18 +282,8 @@ export class MercuryCoreRuntime {
         return "No active run.";
       }
       case "compact": {
-        const workspace = path.resolve(this.config.spacesDir, spaceId);
-        const sessionFile = path.join(workspace, ".mercury.session.jsonl");
-        const result = await compactSession(sessionFile, this.config);
         this.db.setSessionBoundaryToLatest(spaceId);
-        if (result.compacted) {
-          return result.noop
-            ? "Already compacted (nothing to do)."
-            : "Compacted.";
-        }
-        return result.error
-          ? "Compaction failed. Check server logs for details."
-          : "Nothing to compact.";
+        return "Compacted.";
       }
       default:
         return `Unknown command: ${command}`;
@@ -442,7 +403,6 @@ export class MercuryCoreRuntime {
     callerId: string,
     attachments?: MessageAttachment[],
     authorName?: string,
-    contextOpts?: { forceFullSession?: boolean },
   ): Promise<ContainerResult> {
     this.db.ensureSpace(spaceId);
 
@@ -554,41 +514,7 @@ export class MercuryCoreRuntime {
         }
       }
 
-      const history = this.db.getMessagesSinceLastUserTrigger(spaceId, 200);
-      const sessionFile = path.join(workspace, ".mercury.session.jsonl");
-
-      // Conditional context: default minimal for standalone prompts; full session
-      // when API fullContext, attachments, classifier disabled/failed, or classifier says history needed.
-      let useMinimalContext = false;
-      let classification: ContextClassificationResult;
-
-      if (!this.config.conditionalContextEnabled) {
-        classification = { useMinimal: false, classifier: { mode: "off" } };
-      } else if (attachments?.length) {
-        classification = { useMinimal: false, classifier: { mode: "off" } };
-      } else if (contextOpts?.forceFullSession) {
-        classification = { useMinimal: false, classifier: { mode: "off" } };
-      } else {
-        classification = await classifyContextNeeded(
-          finalPrompt,
-          sessionFile,
-          this.config,
-        );
-        useMinimalContext = classification.useMinimal;
-      }
-
-      let contextReason: MessageContextReason;
-      if (!this.config.conditionalContextEnabled) {
-        contextReason = "classifier_disabled";
-      } else if (attachments?.length) {
-        contextReason = "attachments";
-      } else if (contextOpts?.forceFullSession) {
-        contextReason = "reply_or_full_api";
-      } else if (classification.classifierUnavailable) {
-        contextReason = "classifier_failed";
-      } else {
-        contextReason = "classifier";
-      }
+      const history = this.db.getRecentTurns(spaceId, 10);
 
       const startTime = Date.now();
 
@@ -611,18 +537,9 @@ export class MercuryCoreRuntime {
           preferences,
           extraEnv,
           claimedEnvSources: this.extensionRegistry?.getClaimedEnvSources(),
-          useMinimalContext,
         });
       } catch (err) {
-        this.db.updateMessageRunMeta(
-          userMessageId,
-          userTurnRunMeta(
-            useMinimalContext,
-            contextReason,
-            classification,
-            undefined,
-          ),
-        );
+        this.db.updateMessageRunMeta(userMessageId, userTurnRunMeta(undefined));
         throw err;
       }
 
@@ -644,12 +561,7 @@ export class MercuryCoreRuntime {
         if (hookResult?.suppress) {
           this.db.updateMessageRunMeta(
             userMessageId,
-            userTurnRunMeta(
-              useMinimalContext,
-              contextReason,
-              classification,
-              containerResult.usage,
-            ),
+            userTurnRunMeta(containerResult.usage),
           );
           return { reply: "", files: [] };
         }
@@ -666,33 +578,6 @@ export class MercuryCoreRuntime {
 
       this.db.addMessage(spaceId, "assistant", containerResult.reply);
 
-      if (
-        this.config.autoCompactThreshold != null &&
-        !useMinimalContext &&
-        existsSync(sessionFile)
-      ) {
-        const entryCount = countSessionEntries(sessionFile);
-        if (entryCount > this.config.autoCompactThreshold) {
-          void compactSession(sessionFile, this.config)
-            .then((r) => {
-              if (r.compacted) {
-                this.db.setSessionBoundaryToLatest(spaceId);
-                logger.info("Auto-compacted session", {
-                  spaceId,
-                  noop: r.noop,
-                  tokensBefore: r.tokensBefore,
-                });
-              }
-            })
-            .catch((err) =>
-              logger.warn("Auto-compact failed", {
-                spaceId,
-                error: err instanceof Error ? err.message : String(err),
-              }),
-            );
-        }
-      }
-
       if (containerResult.usage) {
         this.db.recordUsage(spaceId, containerResult.usage);
       } else {
@@ -704,12 +589,7 @@ export class MercuryCoreRuntime {
 
       this.db.updateMessageRunMeta(
         userMessageId,
-        userTurnRunMeta(
-          useMinimalContext,
-          contextReason,
-          classification,
-          containerResult.usage,
-        ),
+        userTurnRunMeta(containerResult.usage),
       );
 
       return containerResult;

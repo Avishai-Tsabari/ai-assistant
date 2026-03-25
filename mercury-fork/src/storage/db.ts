@@ -683,6 +683,56 @@ export class Db {
   }
 
   /**
+   * Sliding window: return the last `turnCount` user→assistant turn pairs
+   * plus any ambient messages within that window. Respects session boundary
+   * so `compact` still trims history.
+   */
+  getRecentTurns(spaceId: string, turnCount = 10): StoredMessage[] {
+    const boundary = this.getSessionBoundary(spaceId);
+
+    // Fetch a generous number of recent messages (turns * 5 for ambient padding)
+    const rows = this.db
+      .query(
+        `SELECT
+           id,
+           space_id as spaceId,
+           role,
+           content,
+           attachments,
+           run_meta as runMeta,
+           created_at as createdAt,
+           updated_at as updatedAt
+         FROM messages
+         WHERE space_id = ? AND id > ?
+         ORDER BY id DESC
+         LIMIT ?`,
+      )
+      .all(spaceId, boundary, turnCount * 5) as MessageRow[];
+
+    if (rows.length === 0) return [];
+
+    // Walk backward to find N complete user+assistant turns
+    let turnsFound = 0;
+    let cutoffIndex = rows.length; // index in descending array where we stop
+
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].role === "user") {
+        turnsFound++;
+        if (turnsFound >= turnCount) {
+          cutoffIndex = i + 1; // include this user message
+          break;
+        }
+      }
+    }
+
+    // Slice to the window and reverse to ascending order
+    return rows
+      .slice(0, cutoffIndex)
+      .reverse()
+      .map((row) => this.parseMessageRow(row));
+  }
+
+  /**
    * Case-insensitive substring search over stored message content for a space.
    */
   searchMessages(spaceId: string, query: string, limit = 20): StoredMessage[] {

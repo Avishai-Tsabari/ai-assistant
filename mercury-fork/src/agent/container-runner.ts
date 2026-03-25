@@ -9,7 +9,6 @@ import path, { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AppConfig } from "../config.js";
 import { scanOutbox } from "../core/outbox.js";
-import { mergeMinimalRunIntoSession } from "../core/session-merge.js";
 import { type Logger, logger } from "../logger.js";
 import { getApiKeyFromPiAuthFile } from "../storage/pi-auth.js";
 import type {
@@ -219,7 +218,6 @@ export class AgentContainerRunner {
     preferences?: Array<{ key: string; value: string }>;
     extraEnv?: Record<string, string>;
     claimedEnvSources?: Set<string>;
-    useMinimalContext?: boolean;
   }): Promise<ContainerResult> {
     const globalDir = path.resolve(this.config.globalDir);
     const spacesRoot = path.resolve(this.config.spacesDir);
@@ -377,9 +375,7 @@ export class AgentContainerRunner {
 
     const payload = {
       ...input,
-      messages: input.useMinimalContext
-        ? input.messages.filter((m) => m.role !== "ambient")
-        : input.messages,
+      messages: input.messages,
       spaceWorkspace: input.spaceWorkspace
         .replace(spacesRoot, "/spaces")
         .replaceAll("\\", "/"),
@@ -545,24 +541,6 @@ export class AgentContainerRunner {
 
         const replyText = parsed.reply ?? "Done.";
         const files = scanOutbox(input.spaceWorkspace, startTime);
-
-        if (input.useMinimalContext) {
-          const sessionFile = path.join(
-            spacesRoot,
-            input.spaceId,
-            ".mercury.session.jsonl",
-          );
-          mergeMinimalRunIntoSession(
-            sessionFile,
-            input.prompt,
-            replyText,
-            this.config,
-          ).catch((err) => {
-            log.error("Merge failed, reply still returned", {
-              error: err instanceof Error ? err.message : String(err),
-            });
-          });
-        }
 
         resolve({ reply: replyText, files, usage: parsed.usage });
       });

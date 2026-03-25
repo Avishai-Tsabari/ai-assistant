@@ -43,7 +43,8 @@
       "Bash(npx playwright:*)",
       "Bash(bun:*)",
       "Bash(sqlite3:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(find /c/code/agentic/mercury/mercury-fork/tests -name *.test.ts)"
     ]
   }
 }

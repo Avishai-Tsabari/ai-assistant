@@ -11,7 +11,7 @@ import {
   type PiJsonlParseResult,
   parsePiPrintJsonlOutput,
 } from "./pi-jsonl-parser.js";
-import { formatPreferencesXml } from "./preferences-prompt.js";
+import { escapeXmlText, formatPreferencesXml } from "./preferences-prompt.js";
 
 type Payload = {
   spaceId: string;
@@ -22,7 +22,6 @@ type Payload = {
   authorName?: string;
   attachments?: MessageAttachment[];
   preferences?: Array<{ key: string; value: string }>;
-  useMinimalContext?: boolean;
   nonce?: string;
 };
 
@@ -257,7 +256,10 @@ If a tool call is blocked with "Permission denied", this is a hard security boun
 ## Moderation
 You can mute users who are being abusive, spamming, trying to exfiltrate secrets, or deliberately wasting the group's resources by triggering you for pointless nonsense. Use \`mrctl mute\` when you judge it necessary — you don't need to wait for an admin to ask. Warn the user first, then mute if they continue.`;
 
-  return `${base}\n\n${buildCapabilitySection(caps, payload)}`;
+  const memory = `## Memory
+Your workspace may contain a \`MEMORY.md\` file with a summary of past interactions and important context for this space. If it exists, use it to stay consistent with prior decisions. You may update \`MEMORY.md\` when significant events happen, new patterns emerge, or when asked to remember something. Keep it concise (~1500 tokens max). Use \`mrctl recall\` to search older message history when you need details that are not in the current context.`;
+
+  return `${base}\n\n${buildCapabilitySection(caps, payload)}\n\n${memory}`;
 }
 
 /**
@@ -292,10 +294,55 @@ function formatAttachments(
   return ["<attachments>", ...entries, "</attachments>"].join("\n");
 }
 
+function buildEpisodicMemory(spaceWorkspace: string): string | null {
+  try {
+    const memoryPath = path.join(spaceWorkspace, "MEMORY.md");
+    const content = readFileSync(memoryPath, "utf8").trim();
+    if (!content) return null;
+    return `<episodic_memory>\n${content}\n</episodic_memory>`;
+  } catch {
+    return null;
+  }
+}
+
+function buildHistoryXml(messages: StoredMessage[]): string | null {
+  // Pair up user+assistant turns; skip ambient (they have their own section)
+  const turns: Array<{ user: StoredMessage; assistant?: StoredMessage }> = [];
+  let pendingUser: StoredMessage | null = null;
+
+  for (const m of messages) {
+    if (m.role === "user") {
+      if (pendingUser) {
+        // user without assistant reply (shouldn't normally happen, but include it)
+        turns.push({ user: pendingUser });
+      }
+      pendingUser = m;
+    } else if (m.role === "assistant" && pendingUser) {
+      turns.push({ user: pendingUser, assistant: m });
+      pendingUser = null;
+    }
+  }
+  // Any trailing user message without a reply
+  if (pendingUser) turns.push({ user: pendingUser });
+
+  if (turns.length === 0) return null;
+
+  const entries = turns.map(({ user, assistant }) => {
+    const ts = formatContextTimestamp(user.createdAt);
+    const userLine = `    <user>${escapeXmlText(user.content)}</user>`;
+    const assistantLine = assistant
+      ? `\n    <assistant>${escapeXmlText(assistant.content)}</assistant>`
+      : "";
+    return `  <turn timestamp="${ts}">\n${userLine}${assistantLine}\n  </turn>`;
+  });
+
+  return `<history>\n${entries.join("\n")}\n</history>`;
+}
+
 function buildPrompt(payload: Payload): string {
   const parts: string[] = [];
 
-  // Add caller identity
+  // 1. Caller identity
   const callerId = process.env.CALLER_ID ?? "unknown";
   const role = payload.callerRole ?? "member";
   const space = payload.spaceId ?? "unknown";
@@ -305,7 +352,21 @@ function buildPrompt(payload: Payload): string {
   );
   parts.push("");
 
-  // Add ambient messages context
+  // 2. Episodic memory (MEMORY.md)
+  const episodicMemory = buildEpisodicMemory(payload.spaceWorkspace);
+  if (episodicMemory) {
+    parts.push(episodicMemory);
+    parts.push("");
+  }
+
+  // 3. Recent conversation history (sliding window from DB)
+  const historyXml = buildHistoryXml(payload.messages);
+  if (historyXml) {
+    parts.push(historyXml);
+    parts.push("");
+  }
+
+  // 4. Ambient messages (non-triggered group chat context)
   const ambientEntries = payload.messages
     .filter((m) => m.role === "ambient")
     .map((m) => {
@@ -320,20 +381,21 @@ function buildPrompt(payload: Payload): string {
     parts.push("");
   }
 
+  // 5. Preferences
   const preferencesXml = formatPreferencesXml(payload.preferences);
   if (preferencesXml) {
     parts.push(preferencesXml);
     parts.push("");
   }
 
-  // Add attachments from current message
+  // 6. Attachments from current message
   const attachmentsXml = formatAttachments(payload.attachments);
   if (attachmentsXml) {
     parts.push(attachmentsXml);
     parts.push("");
   }
 
-  // Add the prompt
+  // 7. Current prompt
   parts.push(payload.prompt);
 
   return parts.join("\n");
@@ -398,11 +460,6 @@ function invokePiOnce(
   capabilities: ModelCapabilities,
 ): Promise<PiJsonlParseResult> {
   return new Promise((resolve, reject) => {
-    const sessionFile = path.join(
-      payload.spaceWorkspace,
-      ".mercury.session.jsonl",
-    );
-
     // Combine base system prompt with extension-injected fragments
     let systemPrompt = buildSystemPrompt(capabilities, payload);
     const extPrompt = process.env.MERCURY_EXT_SYSTEM_PROMPT;
@@ -410,9 +467,7 @@ function invokePiOnce(
       systemPrompt = `${systemPrompt}\n\n${extPrompt}`;
     }
 
-    const sessionArgs = payload.useMinimalContext
-      ? ["--no-session"]
-      : ["--session", sessionFile];
+    const sessionArgs = ["--no-session"];
 
     const toolModeArgs = capabilities.tools
       ? ([] as string[])

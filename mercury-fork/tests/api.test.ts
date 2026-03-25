@@ -695,12 +695,12 @@ describe("GET /api/messages/search", () => {
 
   test("400 when limit is invalid", async () => {
     db.ensureSpace("group1");
-    expect(
-      (await api("GET", "/api/messages/search?q=x&limit=0")).status,
-    ).toBe(400);
-    expect(
-      (await api("GET", "/api/messages/search?q=x&limit=-1")).status,
-    ).toBe(400);
+    expect((await api("GET", "/api/messages/search?q=x&limit=0")).status).toBe(
+      400,
+    );
+    expect((await api("GET", "/api/messages/search?q=x&limit=-1")).status).toBe(
+      400,
+    );
     expect(
       (await api("GET", "/api/messages/search?q=x&limit=notanumber")).status,
     ).toBe(400);

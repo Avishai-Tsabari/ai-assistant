@@ -88,7 +88,6 @@ src/
 │       ├── spaces.ts               # /api/spaces/*
 │       ├── conversations.ts        # /api/conversations/*
 │       ├── control.ts              # /api/whoami, /api/stop, /api/compact
-│       ├── session.ts              # /api/session/context
 │       ├── extensions.ts           # /api/ext/*
 │       └── chat.ts                 # /chat (direct agent bridge)
 │
@@ -198,8 +197,7 @@ Internal API used by `mrctl` from inside containers:
 | `/api/conversations/:id/link` | POST | Link conversation to a space |
 | `/api/conversations/:id/unlink` | POST | Unlink conversation from its space |
 | `/api/stop` | POST | Abort current run |
-| `/api/compact` | POST | Session boundary |
-| `/api/session/context` | GET | Pi session context estimate (compact permission) |
+| `/api/compact` | POST | Reset session boundary (excludes old messages from sliding window) |
 | `/api/ext` | GET | List installed extensions |
 | `/api/ext/:name/auth` | POST | Permission check for extension CLI |
 | `/api/tradestation/orders` | POST | TradeStation orderconfirm + two-step place (`tradestation` perm; SIM-only unless `MERCURY_TS_ALLOW_LIVE_ORDERS`) |
@@ -273,6 +271,7 @@ Permissions are now dynamic. Built-in permissions are static; extensions registe
 | [rate-limiting.md](docs/rate-limiting.md) | Rate limits |
 | [media/overview.md](docs/media/overview.md) | Media handling |
 | [extensions.md](docs/extensions.md) | Extension system design |
+| [context-architecture.md](docs/context-architecture.md) | Three-layer context system (identity, episodic memory, archive) |
 
 ## Conventions
 
