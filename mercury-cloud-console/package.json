@@ -10,6 +10,7 @@
     "start": "next start -p 3131",
     "provision": "bun run infra/scripts/provision.ts",
     "health-check": "bun run infra/scripts/health-check.ts",
+    "set-admin": "bun run infra/scripts/seed-admin.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

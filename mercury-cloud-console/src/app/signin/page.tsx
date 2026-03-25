@@ -26,8 +26,7 @@ export default function SignInPage() {
       setError("Invalid email or password");
       return;
     }
-    router.push("/dashboard");
-    router.refresh();
+    router.push("/auth/redirect");
   }
 
   return (
@@ -63,13 +62,13 @@ export default function SignInPage() {
       <button
         type="button"
         className="card"
-        style={{ width: "100%", cursor: "pointer" }}
-        onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+        style={{ width: "100%", cursor: "pointer", color: "var(--foreground)" }}
+        onClick={() => signIn("google", { callbackUrl: "/auth/redirect" })}
       >
         Continue with Google
       </button>
       <p className="muted" style={{ marginTop: "1rem" }}>
-        <Link href="/">Home</Link> · <Link href="/signup">Sign up</Link>
+        <Link href="/signup">Sign up</Link>
       </p>
     </main>
   );

@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { agents } from "@/lib/db/schema";
+import SignOutButton from "./SignOutButton";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -15,8 +16,11 @@ export default async function DashboardPage() {
 
   return (
     <main>
-      <h1>Console</h1>
-      <p className="muted">Signed in as {session!.user!.email}</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <h1 style={{ margin: 0 }}>Console</h1>
+        <SignOutButton />
+      </div>
+      <p className="muted" style={{ marginTop: "0.5rem" }}>Signed in as {session!.user!.email}</p>
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Agents</h2>
         {rows.length === 0 ? (
@@ -44,8 +48,13 @@ export default async function DashboardPage() {
       <p style={{ marginTop: "1rem" }}>
         <Link href="/onboarding">Onboarding checklist</Link>
       </p>
+      {session!.user!.role === "admin" && (
+        <p style={{ marginTop: "0.75rem" }}>
+          <Link href="/admin">Admin Console</Link>
+        </p>
+      )}
       <p className="muted" style={{ marginTop: "1.5rem" }}>
-        <Link href="/">Home</Link> · Automated provision from the UI is the next iteration.
+        <Link href="/dashboard">Dashboard</Link> · Automated provision from the UI is the next iteration.
       </p>
     </main>
   );

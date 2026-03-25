@@ -34,7 +34,13 @@ export function classifyPiFailure(text: string): PiFailureClass {
   }
 
   if (
-    /\b429\b|\b502\b|\b503\b|\b504\b|rate\s+limit|timeout|timed\s+out|ETIMEDOUT|ECONNRESET|temporarily\s+unavailable|overload|try\s+again|service\s+unavailable|bad\s+gateway|gateway\s+timeout/i.test(
+    /\b429\b|rate[_\s]+limit/i.test(text)
+  ) {
+    return "fallbackable";
+  }
+
+  if (
+    /\b502\b|\b503\b|\b504\b|timeout|timed\s+out|ETIMEDOUT|ECONNRESET|temporarily\s+unavailable|overload|try\s+again|service\s+unavailable|bad\s+gateway|gateway\s+timeout/i.test(
       text,
     )
   ) {

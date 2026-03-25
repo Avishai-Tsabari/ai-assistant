@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import SignOutButton from "@/app/(protected)/dashboard/SignOutButton";
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Overview" },
@@ -25,9 +26,12 @@ export default function AdminNavLayout({ children }: { children: ReactNode }) {
         }}
       >
         <h1 style={{ margin: 0 }}>Admin Console</h1>
-        <Link href="/dashboard" className="muted" style={{ fontSize: "0.85rem" }}>
-          &larr; Back to Dashboard
-        </Link>
+        <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+          <Link href="/dashboard" className="muted" style={{ fontSize: "0.85rem" }}>
+            &larr; Dashboard
+          </Link>
+          <SignOutButton />
+        </div>
       </div>
 
       <nav

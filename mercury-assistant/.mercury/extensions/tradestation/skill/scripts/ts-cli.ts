@@ -16,6 +16,7 @@ function usage(): never {
   ts-cli.ts balances <accountKey>
   ts-cli.ts positions <accountKey>
   ts-cli.ts bars <symbol> [barsback]
+  ts-cli.ts quotes <symbols>        (comma-separated, e.g. SPY,QQQ,@ES)
 
 Environment: TRADESTATION_ACCESS_TOKEN (and optional TRADESTATION_API_BASE)`);
   process.exit(1);
@@ -101,6 +102,52 @@ async function main() {
         },
       );
       console.log(JSON.stringify(data, null, 2));
+      break;
+    }
+    case "quotes": {
+      // Comma-separated symbols, e.g. "SPY,QQQ,DIA,@ES"
+      // Uses the streaming SSE endpoint; reads the first quote per symbol then exits.
+      const symbols = rest[0];
+      if (!symbols) usage();
+      const symbolList = symbols.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+      const url = new URL(
+        `/marketdata/stream/quotes/${encodeURIComponent(symbols)}`,
+        `${base}/`,
+      );
+      const res = await fetch(url.toString(), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        console.error(res.status, text);
+        process.exit(1);
+      }
+      const seen = new Set<string>();
+      const quotes: unknown[] = [];
+      outer: for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+        const lines = Buffer.from(chunk).toString("utf8").split("\n");
+        for (const line of lines) {
+          const raw = line.trim();
+          if (!raw) continue;
+          try {
+            const obj = JSON.parse(raw) as Record<string, unknown>;
+            if (obj["Symbol"]) {
+              const sym = String(obj["Symbol"]).toUpperCase();
+              if (!seen.has(sym)) {
+                seen.add(sym);
+                quotes.push(obj);
+              }
+            }
+          } catch {
+            // skip heartbeat / non-JSON lines
+          }
+          if (symbolList.every((s) => seen.has(s))) break outer;
+        }
+      }
+      console.log(JSON.stringify(quotes, null, 2));
       break;
     }
     default:

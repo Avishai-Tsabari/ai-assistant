@@ -74,6 +74,14 @@ function bootstrap(sqlite: Database.Database) {
   } catch {
     // Already nullable or migration failed — ignore
   }
+
+  // Promote ADMIN_EMAIL to admin role (idempotent, runs once per process on DB init)
+  const adminEmail = process.env.ADMIN_EMAIL?.trim();
+  if (adminEmail) {
+    sqlite
+      .prepare(`UPDATE users SET role = 'admin' WHERE email = ? AND role != 'admin'`)
+      .run(adminEmail);
+  }
 }
 
 let drizzleInstance: ReturnType<typeof drizzle<typeof schema>> | undefined;

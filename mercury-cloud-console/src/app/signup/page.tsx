@@ -37,8 +37,7 @@ export default function SignUpPage() {
       setError("Account created but sign-in failed — try signing in.");
       return;
     }
-    router.push("/dashboard");
-    router.refresh();
+    router.push("/auth/redirect");
   }
 
   return (
@@ -75,8 +74,8 @@ export default function SignUpPage() {
       <button
         type="button"
         className="card"
-        style={{ width: "100%", cursor: "pointer" }}
-        onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+        style={{ width: "100%", cursor: "pointer", color: "var(--foreground)" }}
+        onClick={() => signIn("google", { callbackUrl: "/auth/redirect" })}
       >
         Continue with Google
       </button>

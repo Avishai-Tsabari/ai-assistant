@@ -1,6 +1,6 @@
 ---
 name: tradestation
-description: Call TradeStation REST API v3 from the agent (accounts, balances, positions, bars) and place orders via mrctl two-step confirmation. Admin-only; requires Mercury host OAuth setup and token refresh job.
+description: Call TradeStation REST API v3 from the agent (accounts, balances, positions, bars, real-time quotes) and place orders via mrctl two-step confirmation. Admin-only; requires Mercury host OAuth setup and token refresh job.
 allowed-tools: Bash
 ---
 
@@ -24,23 +24,31 @@ If refresh fails, the container may receive `TRADESTATION_AUTH_ERROR` with a sho
 Scripts live next to this skill. In the agent container the skill is typically mounted under `/home/node/.pi/agent/skills/tradestation/`.
 
 ```bash
-bun /home/node/.pi/agent/skills/tradestation/scripts/ts-cli.ts accounts
-bun /home/node/.pi/agent/skills/tradestation/scripts/ts-cli.ts balances ACCOUNT_KEY
-bun /home/node/.pi/agent/skills/tradestation/scripts/ts-cli.ts positions ACCOUNT_KEY
-bun /home/node/.pi/agent/skills/tradestation/scripts/ts-cli.ts bars SYMBOL [barsback]
+TS="$(find /home/node/.pi/agent/skills/tradestation -name ts-cli.ts | head -1)"
+bun "$TS" accounts
+bun "$TS" balances ACCOUNT_KEY
+bun "$TS" positions ACCOUNT_KEY
+bun "$TS" bars SYMBOL [barsback]
+bun "$TS" quotes SYMBOL[,SYMBOL2,...]     # real-time snapshot (one quote per symbol)
 ```
 
 Examples:
 
 ```bash
-bun /home/node/.pi/agent/skills/tradestation/scripts/ts-cli.ts accounts
-bun /home/node/.pi/agent/skills/tradestation/scripts/ts-cli.ts balances SIM123456789
-bun /home/node/.pi/agent/skills/tradestation/scripts/ts-cli.ts positions SIM123456789
-bun /home/node/.pi/agent/skills/tradestation/scripts/ts-cli.ts bars AAPL 20
-bun /home/node/.pi/agent/skills/tradestation/scripts/ts-cli.ts bars '%40ES' 10
+TS="$(find /home/node/.pi/agent/skills/tradestation -name ts-cli.ts | head -1)"
+bun "$TS" accounts
+bun "$TS" balances SIM123456789
+bun "$TS" positions SIM123456789
+bun "$TS" bars AAPL 20
+bun "$TS" bars '@ES' 10
+bun "$TS" quotes SPY,QQQ,DIA,IWM          # US equity index ETFs
+bun "$TS" quotes '@ES,@NQ,@YM'           # US index futures
+bun "$TS" quotes AAPL,MSFT,NVDA          # individual stocks
 ```
 
-Use a URL-encoded symbol for futures (e.g. `@ES` as `%40ES`) or pass `@ES` quoted so the shell does not expand it.
+Use a URL-encoded symbol for futures (e.g. `@ES` as `'@ES'` quoted) so the shell does not expand it.
+
+**`quotes` command**: hits `/marketdata/stream/quotes/{symbols}` (SSE), captures the first quote event per symbol, then exits. Returns an array of quote objects with fields like `Symbol`, `Last`, `Bid`, `Ask`, `NetChange`, `NetChangePct`, `Volume`, `High`, `Low`, `Open`, `PreviousClose`. Best for current price snapshots; use `bars` for historical OHLCV.
 
 ## Orders — two-step confirmation (`mrctl`)
 
@@ -64,4 +72,4 @@ Optional: `--route Intelligent` (default), `--limit-price`, `--stop-price`, `--e
 
 ## Scope
 
-Read helpers: **accounts**, **balances**, **positions**, **bars**. Orders: **host-side** via `mrctl tradestation order` only. Not a full API mirror; no streaming in-container.
+Read helpers: **accounts**, **balances**, **positions**, **bars**, **quotes**. Orders: **host-side** via `mrctl tradestation order` only. Not a full API mirror; no long-running streaming in-container.

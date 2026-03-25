@@ -31,9 +31,15 @@ describe("classifyPiFailure", () => {
     ).toBe("fallbackable");
   });
 
+  test("fallbackable on rate limits", () => {
+    expect(classifyPiFailure("429 rate limit exceeded")).toBe("fallbackable");
+    expect(classifyPiFailure("Rate limit exceeded")).toBe("fallbackable");
+    expect(classifyPiFailure('{"type":"rate_limited"}')).toBe("fallbackable");
+  });
+
   test("retryable on transient signals", () => {
-    expect(classifyPiFailure("429 rate limit exceeded")).toBe("retryable");
     expect(classifyPiFailure("503 service unavailable")).toBe("retryable");
     expect(classifyPiFailure("ETIMEDOUT")).toBe("retryable");
+    expect(classifyPiFailure("bad gateway")).toBe("retryable");
   });
 });
