@@ -20,6 +20,7 @@ export async function GET() {
       id: providerKeys.id,
       provider: providerKeys.provider,
       label: providerKeys.label,
+      keyType: providerKeys.keyType,
       createdAt: providerKeys.createdAt,
     })
     .from(providerKeys)

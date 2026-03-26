@@ -46,6 +46,8 @@ Mercury resolves credentials in this order:
 2. `MERCURY_ANTHROPIC_OAUTH_TOKEN` from `.env`
 3. `MERCURY_ANTHROPIC_API_KEY` from `.env`
 
+> **OAuth always takes precedence over API keys.** If a provider has both an OAuth connection (in `auth.json` or `MERCURY_*_OAUTH_TOKEN`) and an API key (`MERCURY_*_API_KEY`), the OAuth token is used and the API key is ignored. This applies both to the CLI and to agents provisioned via the cloud console.
+
 ### Managing Credentials
 
 ```bash

@@ -12,14 +12,16 @@ trigger:
 # provider first in this list or enable billing on the Google AI project.
 model:
   chain:
+    - provider: anthropic
+      model: claude-sonnet-4-6
     - provider: google
       model: gemini-2.5-flash
     - provider: mistral
       model: mistral-large-latest
     - provider: groq
       model: llama-3.3-70b-versatile
-    - provider: openrouter
-      model: meta-llama/llama-3.3-70b-instruct
+    # - provider: openrouter
+    #  model: meta-llama/llama-3.3-70b-instruct
 
 
 ingress:

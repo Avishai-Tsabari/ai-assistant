@@ -3,11 +3,14 @@
 import { useState, useEffect } from "react";
 import { KNOWN_PROVIDERS } from "@/lib/providers";
 import { useWizard } from "../WizardClient";
+import { OAuthBanner } from "@/app/(protected)/dashboard/keys/OAuthBanner";
+import { OAuthConnectModal } from "@/app/(protected)/dashboard/keys/OAuthConnectModal";
 
 type KeyRow = {
   id: string;
   provider: string;
   label: string | null;
+  keyType: string;
   createdAt: string;
 };
 
@@ -31,8 +34,10 @@ export default function AddKeys() {
   const [label, setLabel] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [oauthProvider, setOAuthProvider] = useState<string | null>(null);
 
   const providerOptions = Object.entries(KNOWN_PROVIDERS);
+  const selectedMeta = KNOWN_PROVIDERS[provider];
 
   useEffect(() => {
     async function loadKeys() {
@@ -79,7 +84,7 @@ export default function AddKeys() {
       const data = (await res.json()) as PostKeyResponse;
       if (!res.ok) throw new Error(data.error ?? "Failed to save key");
       if (data.key) {
-        setKeys((prev) => [...prev, data.key!]);
+        setKeys((prev) => [...prev, { ...data.key!, keyType: "api_key" }]);
       }
       setApiKey("");
       setLabel("");
@@ -92,6 +97,18 @@ export default function AddKeys() {
     }
   }
 
+  async function handleOAuthConnected(_keyId: string) {
+    setOAuthProvider(null);
+    // Reload keys from server to pick up the new OAuth key
+    try {
+      const res = await fetch("/api/user/keys");
+      const data = (await res.json()) as GetKeysResponse;
+      if (res.ok && data.keys) setKeys(data.keys);
+    } catch {
+      // Best-effort; wizard will still advance
+    }
+  }
+
   if (loading) {
     return <p className="muted">Loading keys...</p>;
   }
@@ -100,7 +117,7 @@ export default function AddKeys() {
     <div>
       <h2 style={{ marginTop: 0 }}>Add Provider Keys</h2>
       <p className="muted" style={{ marginTop: 0 }}>
-        Add at least one AI provider API key. These are stored encrypted and used
+        Add at least one AI provider key. These are stored encrypted and used
         to power your agent.
       </p>
 
@@ -123,11 +140,15 @@ export default function AddKeys() {
               >
                 <span>
                   <strong>{KNOWN_PROVIDERS[k.provider]?.label ?? k.provider}</strong>
-                  {k.label && (
+                  {k.keyType === "oauth" ? (
+                    <span style={{ color: "var(--success, green)", marginLeft: "0.5rem", fontSize: "0.85rem" }}>
+                      ✓ Connected
+                    </span>
+                  ) : k.label ? (
                     <span className="muted" style={{ marginLeft: "0.5rem" }}>
                       ({k.label})
                     </span>
-                  )}
+                  ) : null}
                 </span>
                 <span className="muted" style={{ fontSize: "0.85rem" }}>
                   {new Date(k.createdAt).toLocaleDateString()}
@@ -167,6 +188,14 @@ export default function AddKeys() {
                 ))}
               </select>
             </label>
+
+            {selectedMeta?.oauthSupported && (
+              <OAuthBanner
+                meta={selectedMeta}
+                onClick={() => { setShowAdd(false); setOAuthProvider(provider); }}
+              />
+            )}
+
             <label style={{ display: "block", marginBottom: "0.75rem" }}>
               <div className="muted">API Key</div>
               <input
@@ -232,6 +261,15 @@ export default function AddKeys() {
           Next →
         </button>
       </div>
+
+      {oauthProvider && KNOWN_PROVIDERS[oauthProvider] && (
+        <OAuthConnectModal
+          provider={oauthProvider}
+          meta={KNOWN_PROVIDERS[oauthProvider]}
+          onConnected={handleOAuthConnected}
+          onClose={() => setOAuthProvider(null)}
+        />
+      )}
     </div>
   );
 }

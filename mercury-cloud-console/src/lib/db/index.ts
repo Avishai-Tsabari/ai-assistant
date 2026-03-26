@@ -104,6 +104,31 @@ function bootstrap(sqlite: Database.Database) {
     }
   }
 
+  // Migration: add key_type column to provider_keys
+  try {
+    sqlite.exec(`ALTER TABLE provider_keys ADD COLUMN key_type TEXT NOT NULL DEFAULT 'api_key'`);
+  } catch {
+    // Column already exists — ignore
+  }
+
+  // Migration: create oauth_sessions table
+  try {
+    sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS oauth_sessions (
+        id TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        pkce_verifier TEXT,
+        device_code TEXT,
+        device_interval INTEGER,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    `);
+  } catch {
+    // Table already exists — ignore
+  }
+
   // Promote ADMIN_EMAIL to admin role (idempotent, runs once per process on DB init)
   const adminEmail = process.env.ADMIN_EMAIL?.trim();
   if (adminEmail) {

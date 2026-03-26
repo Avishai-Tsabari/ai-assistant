@@ -207,6 +207,23 @@ MERCURY_MODEL_CHAIN=[{"provider":"anthropic","model":"claude-sonnet-4-6"},{"prov
 
 ---
 
+## OAuth Connect (Extension to BYOK)
+
+In addition to pasting raw API keys, the key vault supports **OAuth connections** for providers that offer a subscription-based OAuth flow. OAuth credentials are stored in the same `provider_keys` table with `key_type = "oauth"` (as opposed to `key_type = "api_key"` for raw keys).
+
+**Supported OAuth providers (dashboard):**
+
+| Provider | Flow | Requirement |
+|----------|------|-------------|
+| Anthropic (Claude Pro/Max) | PKCE — user pastes code from Anthropic's callback page | Active Claude Pro or Max subscription |
+| GitHub Copilot | Device code — user enters a code on github.com/login/device | Active GitHub Copilot subscription |
+
+OAuth keys display as "✓ Connected" in the UI instead of a masked key string.
+
+**OAuth precedence:** When a provider has both an OAuth connection and an API key, **OAuth always takes precedence**. At provisioning time the console injects `MERCURY_ANTHROPIC_OAUTH_TOKEN` (or `MERCURY_GITHUB_COPILOT_OAUTH_TOKEN`) instead of the `MERCURY_*_API_KEY` env var. Expired OAuth tokens are automatically refreshed before injection; if refresh fails, provisioning returns HTTP 422 with a clear error asking the user to reconnect.
+
+Google Gemini and OpenAI Codex OAuth are **not** supported via the dashboard (their OAuth redirect URIs are hardcoded to localhost and cannot be used from a web server). Users on those providers must use BYOK (API key).
+
 ## Open Questions
 
 1. **Key rotation push reliability**: the live-push to agents uses `adapters/configure` which may not actually hot-reload provider keys without a process restart. Does `mercury-fork` support live env var reloading for `MERCURY_MODEL_CHAIN`? If not, users need to restart their agent after a key rotation.

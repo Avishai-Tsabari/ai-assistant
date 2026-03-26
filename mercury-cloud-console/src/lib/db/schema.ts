@@ -48,8 +48,37 @@ export const providerKeys = sqliteTable("provider_keys", {
   provider: text("provider").notNull(),
   /** User-defined label, e.g. "Work Anthropic key" */
   label: text("label"),
-  /** AES-GCM ciphertext (hex) of the plaintext API key */
+  /**
+   * "api_key" (default) → encryptedKey holds a plaintext API key string.
+   * "oauth" → encryptedKey holds JSON { access, refresh, expires, ...extra }.
+   */
+  keyType: text("key_type").notNull().default("api_key"),
+  /** AES-GCM ciphertext (hex) of the plaintext API key or OAuth credentials JSON */
   encryptedKey: text("encrypted_key").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
+/**
+ * Short-lived session state for in-progress OAuth flows.
+ * Rows expire after ~10 minutes and are deleted on completion.
+ */
+export const oauthSessions = sqliteTable("oauth_sessions", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull(),
+  /** "anthropic" | "github-copilot" */
+  provider: text("provider").notNull(),
+  /** PKCE verifier (Anthropic only) */
+  pkceVerifier: text("pkce_verifier"),
+  /** Device code for polling (GitHub Copilot only) */
+  deviceCode: text("device_code"),
+  /** GitHub device flow polling interval in seconds */
+  deviceInterval: integer("device_interval"),
+  /** ISO timestamp — reject sessions older than this */
+  expiresAt: text("expires_at").notNull(),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),

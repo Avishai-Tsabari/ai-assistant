@@ -12,7 +12,9 @@
     "health-check": "bun run infra/scripts/health-check.ts",
     "set-admin": "bun run infra/scripts/seed-admin.ts",
     "db:push": "drizzle-kit push",
-    "usage-alerts": "bun run infra/scripts/usage-alerts-daemon.ts"
+    "usage-alerts": "bun run infra/scripts/usage-alerts-daemon.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -27,13 +29,15 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
     "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^7.6.12",
     "@types/bun": "^1.2.0",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "drizzle-kit": "^0.30.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.2"
   }
 }

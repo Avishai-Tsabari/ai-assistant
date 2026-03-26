@@ -13,6 +13,7 @@ export default async function KeysPage() {
       id: providerKeys.id,
       provider: providerKeys.provider,
       label: providerKeys.label,
+      keyType: providerKeys.keyType,
       createdAt: providerKeys.createdAt,
     })
     .from(providerKeys)

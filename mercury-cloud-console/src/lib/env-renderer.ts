@@ -8,6 +8,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export type ResolvedProviderKey = {
   provider: string;
   apiKey: string;
+  /** If set, use this env var name instead of providerEnvVar(provider) */
+  envVarOverride?: string;
 };
 
 export type ModelChainLeg = {
@@ -33,7 +35,7 @@ export function loadEnvTemplate(): string {
 
 export function renderMercuryEnv(input: AgentEnvInput): string {
   const providerKeyLines = input.resolvedKeys
-    .map(({ provider, apiKey }) => `${providerEnvVar(provider)}=${apiKey}`)
+    .map(({ provider, apiKey, envVarOverride }) => `${envVarOverride ?? providerEnvVar(provider)}=${apiKey}`)
     .join("\n");
 
   const modelChainJson = JSON.stringify(

@@ -4,8 +4,10 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { assertUserOrThrow } from "@/lib/admin-guard";
 import { getDb, providerKeys } from "@/lib/db";
-import { decryptSecret, getMasterKey } from "@/lib/encryption";
+import { decryptSecret, encryptSecret, getMasterKey } from "@/lib/encryption";
 import { provisionAgent } from "@/lib/provisioner";
+import { oauthEnvVar } from "@/lib/providers";
+import { refreshOAuthCredentials, type OAuthCredentials } from "@/lib/oauth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,7 +47,7 @@ export async function POST(request: Request) {
 
   // Resolve each keyId → { provider, apiKey, model }
   const db = getDb();
-  const resolvedChain: { provider: string; apiKey: string; model: string }[] = [];
+  const resolvedChain: { provider: string; apiKey: string; model: string; envVarOverride?: string }[] = [];
 
   for (const leg of modelChain) {
     const keyRow = db
@@ -61,9 +63,9 @@ export async function POST(request: Request) {
       );
     }
 
-    let decryptedKey: string;
+    let decryptedPayload: string;
     try {
-      decryptedKey = decryptSecret(keyRow.encryptedKey, masterKey);
+      decryptedPayload = decryptSecret(keyRow.encryptedKey, masterKey);
     } catch {
       return NextResponse.json(
         { error: `Failed to decrypt key ${leg.keyId}` },
@@ -71,11 +73,50 @@ export async function POST(request: Request) {
       );
     }
 
-    resolvedChain.push({
-      provider: keyRow.provider,
-      apiKey: decryptedKey,
-      model: leg.model,
-    });
+    if (keyRow.keyType === "oauth") {
+      // OAuth key: decrypt JSON credentials, refresh if expired, inject OAuth token env var
+      let creds: OAuthCredentials;
+      try {
+        creds = JSON.parse(decryptedPayload) as OAuthCredentials;
+      } catch {
+        return NextResponse.json(
+          { error: `Malformed OAuth credentials for key ${leg.keyId}` },
+          { status: 500 },
+        );
+      }
+
+      if (Date.now() > creds.expires) {
+        try {
+          creds = await refreshOAuthCredentials(keyRow.provider, creds);
+          // Persist refreshed credentials back to DB
+          const refreshedEncrypted = encryptSecret(JSON.stringify(creds), masterKey);
+          db.update(providerKeys)
+            .set({ encryptedKey: refreshedEncrypted })
+            .where(eq(providerKeys.id, leg.keyId))
+            .run();
+        } catch (e) {
+          return NextResponse.json(
+            {
+              error: `OAuth token for ${keyRow.provider} is expired and could not be refreshed. Please reconnect via the dashboard.`,
+            },
+            { status: 422 },
+          );
+        }
+      }
+
+      resolvedChain.push({
+        provider: keyRow.provider,
+        apiKey: creds.access,
+        model: leg.model,
+        envVarOverride: oauthEnvVar(keyRow.provider),
+      });
+    } else {
+      resolvedChain.push({
+        provider: keyRow.provider,
+        apiKey: decryptedPayload,
+        model: leg.model,
+      });
+    }
   }
 
   const encoder = new TextEncoder();

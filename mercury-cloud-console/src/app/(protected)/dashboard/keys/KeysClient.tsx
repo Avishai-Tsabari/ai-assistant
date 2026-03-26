@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import { KNOWN_PROVIDERS } from "@/lib/providers";
+import { OAuthBanner } from "./OAuthBanner";
+import { OAuthConnectModal } from "./OAuthConnectModal";
 
 type KeyRow = {
   id: string;
   provider: string;
   label: string | null;
+  keyType: string;
   createdAt: string;
 };
 
@@ -26,8 +29,10 @@ export function KeysClient({ initialKeys }: { initialKeys: KeyRow[] }) {
   const [editId, setEditId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
   const [editKey, setEditKey] = useState("");
+  const [oauthProvider, setOAuthProvider] = useState<string | null>(null);
 
   const providerOptions = Object.entries(KNOWN_PROVIDERS);
+  const selectedMeta = KNOWN_PROVIDERS[provider];
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -41,7 +46,7 @@ export function KeysClient({ initialKeys }: { initialKeys: KeyRow[] }) {
       });
       const data = await res.json() as PostKeyResponse;
       if (!res.ok) throw new Error(data.error ?? "Failed to save key");
-      setKeys((prev) => [...prev, data.key!]);
+      setKeys((prev) => [...prev, { ...data.key!, keyType: "api_key" }]);
       setApiKey("");
       setLabel("");
       setProvider("anthropic");
@@ -94,6 +99,17 @@ export function KeysClient({ initialKeys }: { initialKeys: KeyRow[] }) {
     }
   }
 
+  async function handleOAuthConnected(_keyId: string) {
+    setOAuthProvider(null);
+    try {
+      const res = await fetch("/api/user/keys");
+      const data = await res.json() as { keys?: KeyRow[] };
+      if (res.ok && data.keys) setKeys(data.keys);
+    } catch {
+      // best-effort; key will appear on next page load
+    }
+  }
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
@@ -120,6 +136,14 @@ export function KeysClient({ initialKeys }: { initialKeys: KeyRow[] }) {
                 ))}
               </select>
             </label>
+
+            {selectedMeta?.oauthSupported && (
+              <OAuthBanner
+                meta={selectedMeta}
+                onClick={() => { setShowAdd(false); setOAuthProvider(provider); }}
+              />
+            )}
+
             <label style={{ display: "block", marginBottom: "0.75rem" }}>
               <div className="muted">API Key</div>
               <input
@@ -159,7 +183,7 @@ export function KeysClient({ initialKeys }: { initialKeys: KeyRow[] }) {
           <thead>
             <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
               <th style={th}>Provider</th>
-              <th style={th}>Label</th>
+              <th style={th}>Label / Status</th>
               <th style={th}>Added</th>
               <th style={th}>Actions</th>
             </tr>
@@ -179,6 +203,10 @@ export function KeysClient({ initialKeys }: { initialKeys: KeyRow[] }) {
                       style={{ width: "100%" }}
                       disabled={saving}
                     />
+                  ) : k.keyType === "oauth" ? (
+                    <span style={{ color: "var(--success, green)", fontWeight: 500 }}>
+                      ✓ Connected
+                    </span>
                   ) : (
                     <span className="muted">{k.label ?? "—"}</span>
                   )}
@@ -189,15 +217,17 @@ export function KeysClient({ initialKeys }: { initialKeys: KeyRow[] }) {
                 <td style={td}>
                   {editId === k.id ? (
                     <span style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                      <input
-                        type="password"
-                        value={editKey}
-                        onChange={(e) => setEditKey(e.target.value)}
-                        placeholder="New key (leave blank to keep current)"
-                        autoComplete="off"
-                        style={{ width: "100%" }}
-                        disabled={saving}
-                      />
+                      {k.keyType !== "oauth" && (
+                        <input
+                          type="password"
+                          value={editKey}
+                          onChange={(e) => setEditKey(e.target.value)}
+                          placeholder="New key (leave blank to keep current)"
+                          autoComplete="off"
+                          style={{ width: "100%" }}
+                          disabled={saving}
+                        />
+                      )}
                       <span style={{ display: "flex", gap: "0.5rem" }}>
                         <button type="button" onClick={() => handleUpdate(k.id)} disabled={saving}>
                           {saving ? "Saving…" : "Save"}
@@ -210,19 +240,30 @@ export function KeysClient({ initialKeys }: { initialKeys: KeyRow[] }) {
                     </span>
                   ) : (
                     <span style={{ display: "flex", gap: "0.75rem" }}>
-                      <button
-                        type="button"
-                        onClick={() => { setEditId(k.id); setEditLabel(k.label ?? ""); setEditKey(""); setError(null); }}
-                        style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--accent, #0070f3)", textDecoration: "underline" }}
-                      >
-                        Edit
-                      </button>
+                      {k.keyType !== "oauth" && (
+                        <button
+                          type="button"
+                          onClick={() => { setEditId(k.id); setEditLabel(k.label ?? ""); setEditKey(""); setError(null); }}
+                          style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--accent, #0070f3)", textDecoration: "underline" }}
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {k.keyType === "oauth" && KNOWN_PROVIDERS[k.provider]?.oauthSupported && (
+                        <button
+                          type="button"
+                          onClick={() => setOAuthProvider(k.provider)}
+                          style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--accent, #0070f3)", textDecoration: "underline" }}
+                        >
+                          Reconnect
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => handleDelete(k.id)}
                         style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--error, red)", textDecoration: "underline" }}
                       >
-                        Delete
+                        Disconnect
                       </button>
                     </span>
                   )}
@@ -231,6 +272,15 @@ export function KeysClient({ initialKeys }: { initialKeys: KeyRow[] }) {
             ))}
           </tbody>
         </table>
+      )}
+
+      {oauthProvider && KNOWN_PROVIDERS[oauthProvider] && (
+        <OAuthConnectModal
+          provider={oauthProvider}
+          meta={KNOWN_PROVIDERS[oauthProvider]}
+          onConnected={handleOAuthConnected}
+          onClose={() => setOAuthProvider(null)}
+        />
       )}
     </div>
   );

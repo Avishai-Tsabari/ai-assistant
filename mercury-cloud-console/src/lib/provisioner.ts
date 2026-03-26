@@ -25,10 +25,15 @@ export type ProvisionProgress =
 export type ModelChainEntry = {
   /** Provider id, e.g. "anthropic", "openai", "google" */
   provider: string;
-  /** Plaintext API key — will be encrypted and stored in provider_keys */
+  /** Plaintext API key (or OAuth access token) — will be encrypted and stored in provider_keys */
   apiKey: string;
   /** Model name, e.g. "claude-sonnet-4-6" */
   model: string;
+  /**
+   * Optional override for the env var name injected into the agent .env.
+   * Used for OAuth tokens (e.g. MERCURY_ANTHROPIC_OAUTH_TOKEN vs MERCURY_ANTHROPIC_API_KEY).
+   */
+  envVarOverride?: string;
 };
 
 export type ProvisionRequest = {
@@ -115,7 +120,11 @@ export async function* provisionAgent(
   );
 
   const envContent = renderMercuryEnv({
-    resolvedKeys: req.modelChain.map(({ provider, apiKey }) => ({ provider, apiKey })),
+    resolvedKeys: req.modelChain.map(({ provider, apiKey, envVarOverride }) => ({
+      provider,
+      apiKey,
+      envVarOverride,
+    })),
     modelChain: req.modelChain.map(({ provider, model }) => ({ provider, model })),
     apiSecret,
     agentImage,
