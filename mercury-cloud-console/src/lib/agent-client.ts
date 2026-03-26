@@ -1,7 +1,30 @@
+import { decryptSecret, getMasterKey } from "@/lib/encryption";
+
 export type HealthResponse = {
   status: string;
   uptime?: number;
   adapters?: Record<string, boolean>;
+};
+
+export type UsageSpaceRow = {
+  spaceId: string;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalTokens: number;
+  totalCost: number;
+  runCount: number;
+  lastUsedAt: number | null;
+};
+
+export type UsageResponse = {
+  totals: {
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    totalTokens: number;
+    totalCost: number;
+    runCount: number;
+  };
+  perSpace: UsageSpaceRow[];
 };
 
 export async function fetchAgentHealth(
@@ -96,4 +119,48 @@ export async function installExtensionOnAgent(opts: {
     return { ok: false, error: j.error ?? res.statusText };
   }
   return { ok: true };
+}
+
+/* ── Usage ───────────────────────────────────────────────────── */
+
+const USAGE_TIMEOUT_MS = 8_000;
+
+/**
+ * Fetch usage data from a Mercury agent's /api/console/usage endpoint.
+ * Returns null on any error (network, auth, timeout, parse failure).
+ */
+export async function fetchAgentUsage(agent: {
+  healthUrl: string;
+  apiSecretCipher: string;
+}): Promise<UsageResponse | null> {
+  const masterKey = getMasterKey();
+  if (!masterKey) {
+    console.warn("[agent-client] CONSOLE_ENCRYPTION_MASTER_KEY not set — cannot fetch usage");
+    return null;
+  }
+
+  let apiSecret: string;
+  try {
+    apiSecret = decryptSecret(agent.apiSecretCipher, masterKey);
+  } catch {
+    console.warn("[agent-client] Failed to decrypt apiSecretCipher");
+    return null;
+  }
+
+  const baseUrl = agent.healthUrl.replace(/\/health\/?$/, "").replace(/\/$/, "");
+  const url = `${baseUrl}/api/console/usage`;
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), USAGE_TIMEOUT_MS);
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${apiSecret}` },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    return (await res.json()) as UsageResponse;
+  } catch {
+    return null;
+  }
 }

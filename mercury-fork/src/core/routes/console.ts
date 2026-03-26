@@ -13,6 +13,7 @@ import {
   removeInstalledExtension,
   resolveExamplesExtensionDir,
 } from "../../extensions/installer.js";
+import type { Db } from "../../storage/db.js";
 
 /* ── Adapter configuration helpers ──────────────────────────────── */
 
@@ -37,7 +38,7 @@ const ADAPTER_ENABLE_VARS: Record<string, string> = {
  * Parse a `.env` file into ordered entries preserving comments and blanks.
  * Returns an array of `{ key, value, raw }` where key is null for non-KV lines.
  */
-function parseDotEnv(
+export function parseDotEnv(
   content: string,
 ): { key: string | null; value: string; raw: string }[] {
   return content.split(/\r?\n/).map((raw) => {
@@ -51,7 +52,7 @@ function parseDotEnv(
  * Update keys in a `.env` file. Keys mapped to `null` are removed.
  * Writes atomically via tmp+rename.
  */
-function updateDotEnv(
+export function updateDotEnv(
   envPath: string,
   updates: Record<string, string | null>,
 ): void {
@@ -122,6 +123,7 @@ export function createConsoleApp(opts: {
   projectRoot: string;
   packageRoot: string;
   apiSecret: string | undefined;
+  db?: Db;
 }): Hono {
   const app = new Hono();
 
@@ -317,6 +319,26 @@ export function createConsoleApp(opts: {
     }, 500);
 
     return c.json({ ok: true, restarting: true });
+  });
+
+  /* ── Usage data ──────────────────────────────────────────────── */
+
+  app.get("/usage", (c) => {
+    if (!opts.db) {
+      return c.json({ error: "Database not available" }, 503);
+    }
+    const totals = opts.db.getUsageTotals();
+    const summary = opts.db.getUsageSummary();
+    const perSpace = summary.map((row) => ({
+      spaceId: row.spaceId,
+      totalInputTokens: row.totalInputTokens,
+      totalOutputTokens: row.totalOutputTokens,
+      totalTokens: row.totalTokens,
+      totalCost: row.totalCost,
+      runCount: row.runCount,
+      lastUsedAt: row.lastUsedAt ?? null,
+    }));
+    return c.json({ totals, perSpace });
   });
 
   return app;

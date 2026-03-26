@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: text("id")
@@ -63,6 +63,95 @@ export const subscriptions = sqliteTable("subscriptions", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  priceId: text("price_id"),
+  currentPeriodEnd: text("current_period_end"),
+  canceledAt: text("canceled_at"),
   status: text("status").notNull().default("inactive"),
   updatedAt: text("updated_at").notNull(),
+});
+
+/** Alert thresholds configured per agent. */
+export const usageAlerts = sqliteTable("usage_alerts", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  agentId: text("agent_id")
+    .notNull()
+    .references(() => agents.id, { onDelete: "cascade" }),
+  thresholdType: text("threshold_type", {
+    enum: ["daily_tokens", "monthly_tokens", "daily_cost", "monthly_cost"],
+  }).notNull(),
+  thresholdValue: real("threshold_value").notNull(),
+  enabled: integer("enabled").notNull().default(1),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updated_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
+/** Immutable usage snapshots polled from agents. */
+export const usageSnapshots = sqliteTable("usage_snapshots", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  agentId: text("agent_id")
+    .notNull()
+    .references(() => agents.id, { onDelete: "cascade" }),
+  spaceId: text("space_id"),
+  totalInputTokens: integer("total_input_tokens").notNull(),
+  totalOutputTokens: integer("total_output_tokens").notNull(),
+  totalTokens: integer("total_tokens").notNull(),
+  totalCost: real("total_cost").notNull(),
+  runCount: integer("run_count").notNull(),
+  lastUsedAt: integer("last_used_at"),
+  snapshotAt: text("snapshot_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
+/** Alert fire history. */
+export const alertEvents = sqliteTable("alert_events", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  agentId: text("agent_id")
+    .notNull()
+    .references(() => agents.id, { onDelete: "cascade" }),
+  alertId: text("alert_id")
+    .notNull()
+    .references(() => usageAlerts.id, { onDelete: "cascade" }),
+  snapshotId: text("snapshot_id")
+    .notNull()
+    .references(() => usageSnapshots.id, { onDelete: "cascade" }),
+  thresholdType: text("threshold_type").notNull(),
+  currentValue: real("current_value").notNull(),
+  thresholdValue: real("threshold_value").notNull(),
+  breachPct: real("breach_pct"),
+  firedAt: text("fired_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  notifiedAt: text("notified_at"),
+});
+
+/** User notification preferences for usage alerts. */
+export const alertNotifications = sqliteTable("alert_notifications", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  alertEnabled: integer("alert_enabled").notNull().default(1),
+  digestFrequency: text("digest_frequency", {
+    enum: ["immediate", "daily"],
+  })
+    .notNull()
+    .default("immediate"),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
 });

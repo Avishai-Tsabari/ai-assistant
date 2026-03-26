@@ -17,6 +17,16 @@ export default async function OnboardingPage() {
   return (
     <main>
       <h1>Agent onboarding</h1>
+      <div className="card" style={{ marginBottom: "1.5rem", background: "color-mix(in srgb, var(--accent, #0070f3) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--accent, #0070f3) 30%, transparent)" }}>
+        <p style={{ margin: 0, fontSize: "1rem" }}>
+          <strong>New:</strong> Provision your agent in minutes using the guided setup wizard.
+        </p>
+        <p style={{ margin: "0.75rem 0 0" }}>
+          <Link href="/wizard" style={{ fontSize: "1rem", fontWeight: 600 }}>
+            Launch Setup Wizard →
+          </Link>
+        </p>
+      </div>
       <div className="card">
         <ol style={{ paddingLeft: "1.25rem" }}>
           <li style={{ marginBottom: "0.75rem" }}>

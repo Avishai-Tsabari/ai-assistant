@@ -183,6 +183,7 @@ export function createApp(ctx: ServerContext): Hono {
     projectRoot,
     packageRoot,
     apiSecret: config.apiSecret,
+    db: core.db,
   });
   app.route("/api/console", consoleApp);
 

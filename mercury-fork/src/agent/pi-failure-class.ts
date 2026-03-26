@@ -46,6 +46,14 @@ export function classifyPiFailure(text: string): PiFailureClass {
   }
 
   if (
+    /\b402\b|insufficient\s+credits?|not\s+enough\s+credits?|purchase\s+(more\s+)?credits?|no\s+credits?/i.test(
+      text,
+    )
+  ) {
+    return "fallbackable";
+  }
+
+  if (
     /\b502\b|\b503\b|\b504\b|timeout|timed\s+out|ETIMEDOUT|ECONNRESET|temporarily\s+unavailable|overload|try\s+again|service\s+unavailable|bad\s+gateway|gateway\s+timeout/i.test(
       text,
     )

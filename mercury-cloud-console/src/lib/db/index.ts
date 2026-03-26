@@ -90,6 +90,20 @@ function bootstrap(sqlite: Database.Database) {
     // Already nullable or migration failed — ignore
   }
 
+  // Migration: add new billing columns to subscriptions table
+  for (const col of [
+    "ALTER TABLE subscriptions ADD COLUMN stripe_subscription_id TEXT",
+    "ALTER TABLE subscriptions ADD COLUMN price_id TEXT",
+    "ALTER TABLE subscriptions ADD COLUMN current_period_end TEXT",
+    "ALTER TABLE subscriptions ADD COLUMN canceled_at TEXT",
+  ]) {
+    try {
+      sqlite.exec(col);
+    } catch {
+      // Column already exists — ignore
+    }
+  }
+
   // Promote ADMIN_EMAIL to admin role (idempotent, runs once per process on DB init)
   const adminEmail = process.env.ADMIN_EMAIL?.trim();
   if (adminEmail) {

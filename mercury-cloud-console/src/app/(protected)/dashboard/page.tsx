@@ -22,11 +22,16 @@ export default async function DashboardPage() {
       </div>
       <p className="muted" style={{ marginTop: "0.5rem" }}>Signed in as {session!.user!.email}</p>
       <div className="card">
-        <h2 style={{ marginTop: 0 }}>Agents</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+          <h2 style={{ margin: 0 }}>Agents</h2>
+          <Link href="/wizard">
+            <button type="button">+ Provision New Agent</button>
+          </Link>
+        </div>
         {rows.length === 0 ? (
           <p className="muted">
-            No agents linked yet. Use the Phase 1 CLI (<code>bun run provision</code>) or add
-            rows via the database. Future: wizard + Stripe here.
+            No agents linked yet.{" "}
+            <Link href="/wizard">Launch the setup wizard</Link> to provision your first agent.
           </p>
         ) : (
           <ul style={{ paddingLeft: "1.25rem" }}>
@@ -47,6 +52,8 @@ export default async function DashboardPage() {
       </div>
       <p style={{ marginTop: "1rem" }}>
         <Link href="/dashboard/keys">Manage API Keys</Link>
+        {" · "}
+        <Link href="/dashboard/billing">Billing</Link>
         {" · "}
         <Link href="/onboarding">Onboarding checklist</Link>
       </p>

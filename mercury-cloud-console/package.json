@@ -11,7 +11,8 @@
     "provision": "bun run infra/scripts/provision.ts",
     "health-check": "bun run infra/scripts/health-check.ts",
     "set-admin": "bun run infra/scripts/seed-admin.ts",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "usage-alerts": "bun run infra/scripts/usage-alerts-daemon.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

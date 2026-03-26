@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import path from "node:path";
 import { Hono } from "hono";
 import { html, raw } from "hono/html";
 import { streamSSE } from "hono/streaming";
@@ -25,6 +26,7 @@ import {
   validateDashboardBuiltinConfig,
 } from "./config-builtin.js";
 import { validatePrefKey, validatePrefValue } from "./prefs.js";
+import { updateDotEnv } from "./console.js";
 
 const VOICE_TRANSCRIBE_EXT = "voice-transcribe";
 const VT_KEY = {
@@ -106,6 +108,15 @@ export function createDashboardRoutes(ctx: DashboardContext) {
     packageRoot,
   } = ctx;
   const app = new Hono();
+
+  const MODEL_PROVIDERS: { id: string; label: string; envVar: string; placeholder: string }[] = [
+    { id: "anthropic",  label: "Anthropic",      envVar: "MERCURY_ANTHROPIC_API_KEY",  placeholder: "sk-ant-..." },
+    { id: "openai",     label: "OpenAI",          envVar: "MERCURY_OPENAI_API_KEY",     placeholder: "sk-..." },
+    { id: "google",     label: "Google Gemini",   envVar: "MERCURY_GEMINI_API_KEY",     placeholder: "AIza..." },
+    { id: "groq",       label: "Groq",            envVar: "MERCURY_GROQ_API_KEY",       placeholder: "gsk_..." },
+    { id: "mistral",    label: "Mistral",         envVar: "MERCURY_MISTRAL_API_KEY",    placeholder: "..." },
+    { id: "openrouter", label: "OpenRouter",      envVar: "MERCURY_OPENROUTER_API_KEY", placeholder: "sk-or-..." },
+  ];
 
   // ─── Helpers ────────────────────────────────────────────────────────────
 
@@ -1541,26 +1552,108 @@ export function createDashboardRoutes(ctx: DashboardContext) {
 
   app.get("/page/keys", (c) => {
     c.header("Cache-Control", "no-store");
+    const envPath = path.join(projectRoot, ".env");
+
+    const providerRows = MODEL_PROVIDERS.map((p) => {
+      const isSet = !!process.env[p.envVar];
+      const badge = isSet
+        ? `<span class="badge" style="background:var(--green);color:#000;font-size:11px">SET</span>`
+        : `<span class="badge" style="background:var(--border);color:var(--muted);font-size:11px">NOT SET</span>`;
+      const clearBtn = isSet
+        ? `<button class="btn btn-sm btn-danger" type="submit" form="clear-${p.id}" style="white-space:nowrap">Clear</button>
+           <form id="clear-${p.id}" hx-post="/dashboard/api/keys/clear" hx-target="#keys-feedback" hx-swap="innerHTML" style="display:none">
+             <input type="hidden" name="provider" value="${p.id}" />
+           </form>`
+        : "";
+      return `
+        <div style="display:grid;grid-template-columns:140px 60px 1fr auto auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+          <span style="font-weight:500">${p.label}</span>
+          ${badge}
+          <form hx-post="/dashboard/api/keys/set" hx-target="#keys-feedback" hx-swap="innerHTML"
+                style="display:flex;gap:8px;align-items:center">
+            <input type="hidden" name="provider" value="${p.id}" />
+            <input type="password" name="apiKey" placeholder="${p.placeholder}" autocomplete="off"
+                   style="flex:1;min-width:0;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius,4px);font-size:13px;font-family:monospace" />
+            <button class="btn btn-sm" type="submit">Save</button>
+          </form>
+          <span>${clearBtn}</span>
+        </div>`;
+    }).join("");
+
     return c.html(html`
       <div class="page-header">
         <h2>API keys</h2>
       </div>
       <p class="muted" style="margin: -8px 0 16px; font-size: 13px; line-height: 1.5;">
-        Provider and platform secrets load from environment variables (<span class="mono">MERCURY_*</span>) and are <strong>never</strong> shown here in plaintext.
+        Keys are written to <span class="mono">.env</span> and are <strong>never</strong> shown in plaintext.
+        Mercury restarts automatically after saving.
       </p>
+
+      <div id="keys-feedback" style="min-height:4px"></div>
+
+      <div class="panel" style="margin-bottom:16px">
+        <div class="panel-header" style="font-weight:600;font-size:13px">Model providers</div>
+        <div class="panel-body" style="padding:0 16px">
+          ${raw(providerRows)}
+        </div>
+      </div>
+
       <div class="panel">
         <div class="panel-body">
-          <ul style="padding-left: 18px; line-height: 1.6;">
-            <li>Edit <span class="mono">.env</span> in your Mercury project directory, then restart: <span class="mono">mercury service install</span></li>
-            <li>Prefer a secret manager in production (inject env at runtime).</li>
-            <li>For managed hosting, keys may be stored encrypted in the control plane — use the operator&apos;s onboarding UI.</li>
-          </ul>
-          <p class="muted" style="margin-top: 16px; font-size: 13px;">
-            OAuth tokens (e.g. Anthropic via <span class="mono">mercury auth login</span>) live under <span class="mono">.mercury/global/</span> on disk.
+          <p class="muted" style="font-size:13px;margin:0">
+            <strong>OAuth tokens</strong> (e.g. Anthropic via <span class="mono">mercury auth login</span>)
+            live under <span class="mono">.mercury/global/</span> and take precedence over API keys set here.
+            Use the CLI to log in with OAuth.
           </p>
         </div>
       </div>
     `);
+  });
+
+  app.post("/api/keys/set", async (c) => {
+    const form = await c.req.parseBody();
+    const provider = typeof form.provider === "string" ? form.provider.trim() : "";
+    const apiKey = typeof form.apiKey === "string" ? form.apiKey.trim() : "";
+
+    const meta = MODEL_PROVIDERS.find((p) => p.id === provider);
+    if (!meta) {
+      return c.html(renderFeaturesToast("error", "Unknown provider."));
+    }
+    if (!apiKey) {
+      return c.html(renderFeaturesToast("error", "API key cannot be empty."));
+    }
+
+    try {
+      const envPath = path.join(projectRoot, ".env");
+      updateDotEnv(envPath, { [meta.envVar]: apiKey });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return c.html(renderFeaturesToast("error", `Failed to write .env: ${msg}`));
+    }
+
+    setTimeout(() => process.kill(process.pid, "SIGTERM"), 500);
+    return c.html(renderFeaturesToast("success", `${meta.label} key saved — restarting…`));
+  });
+
+  app.post("/api/keys/clear", async (c) => {
+    const form = await c.req.parseBody();
+    const provider = typeof form.provider === "string" ? form.provider.trim() : "";
+
+    const meta = MODEL_PROVIDERS.find((p) => p.id === provider);
+    if (!meta) {
+      return c.html(renderFeaturesToast("error", "Unknown provider."));
+    }
+
+    try {
+      const envPath = path.join(projectRoot, ".env");
+      updateDotEnv(envPath, { [meta.envVar]: null });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return c.html(renderFeaturesToast("error", `Failed to write .env: ${msg}`));
+    }
+
+    setTimeout(() => process.kill(process.pid, "SIGTERM"), 500);
+    return c.html(renderFeaturesToast("success", `${meta.label} key cleared — restarting…`));
   });
 
   // ─── SSE Stream ─────────────────────────────────────────────────────────
