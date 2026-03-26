@@ -9,6 +9,12 @@ export interface PiJsonlParseResult {
    * (retry / next model leg), not as a user-visible reply string.
    */
   piFailureMessage?: string;
+  /**
+   * Set when the model emitted a tool call as raw text (JSON or XML format) instead
+   * of a proper tool_use block that pi can execute. The leaked call was stripped from
+   * the reply. Caller may retry with tools disabled to get a clean text-only response.
+   */
+  hadToolLeakage?: boolean;
 }
 
 const USAGE_EVENTS = new Set(["turn_end", "message_end"]);
@@ -79,15 +85,24 @@ function usageRecordHasSignal(u: Record<string, unknown>): boolean {
 }
 
 /**
- * Some providers/models put tool-style JSON in the assistant *text* channel
- * (e.g. `bashuseeland{"command":"mrctl …"}`) instead of structured tool calls.
- * Strip the blob so raw JSON doesn't leak into Telegram/WhatsApp.
+ * Some providers/models put tool-style content in the assistant *text* channel
+ * instead of structured tool calls. Two known formats:
+ *   1. JSON blob:  `bash{"command":"mrctl …"}`
+ *   2. XML format: `<function name="bash" parameters="{…}" />`
+ * Strip these so raw tool calls don't leak into Telegram/WhatsApp.
  * Returns any meaningful text that preceded the blob, or empty string.
  */
 export function sanitizeLeakedToolCallText(text: string): string {
   const raw = text.trim();
   if (!raw) return raw;
 
+  // XML format: <function name="bash" ...> or <function name="bash" .../>
+  const xmlFuncMatch = raw.match(/^([\s\S]*?)<function\s+name=["']bash["']/i);
+  if (xmlFuncMatch) {
+    return xmlFuncMatch[1].trim();
+  }
+
+  // JSON format: bash{"command":...}
   const jsonStart = raw.indexOf('{"command"');
   if (jsonStart < 0) return raw;
 
@@ -249,7 +264,9 @@ export function parsePiPrintJsonlOutput(stdout: string): PiJsonlParseResult {
     return { reply: "", piFailureMessage };
   }
 
+  const replyBeforeSanitize = reply.trim();
   reply = sanitizeLeakedToolCallText(reply);
+  const hadToolLeakage = reply !== replyBeforeSanitize;
   if (!reply.trim()) {
     reply = "Done.";
   }
@@ -285,5 +302,5 @@ export function parsePiPrintJsonlOutput(stdout: string): PiJsonlParseResult {
     };
   }
 
-  return { reply, usage };
+  return { reply, usage, ...(hadToolLeakage ? { hadToolLeakage: true } : {}) };
 }

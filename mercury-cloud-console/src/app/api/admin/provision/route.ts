@@ -14,12 +14,33 @@ export async function POST(request: Request) {
   if (denied) return denied;
 
   const body = await request.json().catch(() => null);
-  const { userId, hostname, anthropicApiKey, extensionIds, extensionsRepo, optionalEnv } =
+  const { userId, hostname, modelChain, extensionIds, extensionsRepo, optionalEnv } =
     (body ?? {}) as Record<string, unknown>;
 
-  if (!userId || !hostname || !anthropicApiKey) {
+  if (!userId || !hostname) {
     return NextResponse.json(
-      { error: "userId, hostname, and anthropicApiKey are required" },
+      { error: "userId and hostname are required" },
+      { status: 400 },
+    );
+  }
+
+  if (
+    !Array.isArray(modelChain) ||
+    modelChain.length === 0 ||
+    !(modelChain as unknown[]).every(
+      (leg) =>
+        typeof leg === "object" &&
+        leg !== null &&
+        typeof (leg as Record<string, unknown>).provider === "string" &&
+        typeof (leg as Record<string, unknown>).apiKey === "string" &&
+        typeof (leg as Record<string, unknown>).model === "string",
+    )
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "modelChain must be a non-empty array of { provider, apiKey, model }",
+      },
       { status: 400 },
     );
   }
@@ -45,7 +66,7 @@ export async function POST(request: Request) {
         const gen = provisionAgent({
           userId: userId as string,
           hostname: hostname as string,
-          anthropicApiKey: anthropicApiKey as string,
+          modelChain: modelChain as { provider: string; apiKey: string; model: string }[],
           extensionIds: Array.isArray(extensionIds) ? (extensionIds as string[]) : [],
           extensionsRepo: extensionsRepo as string | undefined,
           optionalEnv: optionalEnv as Record<string, string> | undefined,

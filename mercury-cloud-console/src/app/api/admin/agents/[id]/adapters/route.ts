@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { auth } from "@/auth";
 import { assertAdminOrThrow } from "@/lib/admin-guard";
 import { getDb } from "@/lib/db";
-import { decryptSecret } from "@/lib/encryption";
+import { decryptSecret, getMasterKey } from "@/lib/encryption";
 import {
   fetchAgentAdapters,
   configureAgentAdapters,
@@ -32,10 +32,6 @@ function lookupAgent(id: string): AgentRow | undefined {
 function agentBaseUrl(healthUrl: string): string {
   // healthUrl is like "http://1.2.3.4:8787" — same base for /api/console/*
   return healthUrl.replace(/\/+$/, "");
-}
-
-function getMasterKey(): string | null {
-  return process.env.CONSOLE_ENCRYPTION_MASTER_KEY ?? null;
 }
 
 /** GET /api/admin/agents/[id]/adapters — fetch current adapter state from agent */

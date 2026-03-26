@@ -8,8 +8,8 @@ import {
 import { renderMercuryEnv } from "@/lib/env-renderer";
 import { resolveMercuryAdd } from "@/lib/catalog";
 import { createHetznerDnsARecord, HetznerClient } from "@/lib/hetzner";
-import { getDb, agents as agentsTable, users } from "@/lib/db";
-import { encryptSecret } from "@/lib/encryption";
+import { getDb, agents as agentsTable, providerKeys as providerKeysTable, users } from "@/lib/db";
+import { encryptSecret, getMasterKey } from "@/lib/encryption";
 
 export type ProvisionProgress =
   | { type: "progress"; message: string }
@@ -22,11 +22,21 @@ export type ProvisionProgress =
     }
   | { type: "error"; message: string };
 
+export type ModelChainEntry = {
+  /** Provider id, e.g. "anthropic", "openai", "google" */
+  provider: string;
+  /** Plaintext API key — will be encrypted and stored in provider_keys */
+  apiKey: string;
+  /** Model name, e.g. "claude-sonnet-4-6" */
+  model: string;
+};
+
 export type ProvisionRequest = {
   /** DB user.id — caller must verify it exists */
   userId: string;
   hostname: string;
-  anthropicApiKey: string;
+  /** Ordered model chain; at least one entry required */
+  modelChain: ModelChainEntry[];
   extensionIds: string[];
   extensionsRepo?: string;
   optionalEnv?: Record<string, string>;
@@ -91,7 +101,7 @@ export async function* provisionAgent(
     process.env.MERCURY_AGENT_IMAGE ?? "ghcr.io/michaelliv/mercury-agent:latest";
   const ghcrToken = process.env.GHCR_TOKEN;
   const ghcrUsername = process.env.GHCR_USERNAME;
-  const masterKey = process.env.CONSOLE_ENCRYPTION_MASTER_KEY ?? null;
+  const masterKey = getMasterKey();
 
   const repo =
     req.extensionsRepo ??
@@ -105,7 +115,8 @@ export async function* provisionAgent(
   );
 
   const envContent = renderMercuryEnv({
-    anthropicApiKey: req.anthropicApiKey,
+    resolvedKeys: req.modelChain.map(({ provider, apiKey }) => ({ provider, apiKey })),
+    modelChain: req.modelChain.map(({ provider, model }) => ({ provider, model })),
     apiSecret,
     agentImage,
     optionalLines,
@@ -167,19 +178,43 @@ export async function* provisionAgent(
   const apiSecretCipher =
     masterKey && masterKey.length > 0 ? encryptSecret(apiSecret, masterKey) : null;
 
-  db.insert(agentsTable)
-    .values({
-      id: agentId,
-      userId: req.userId,
-      hostname: req.hostname,
-      serverId,
-      ipv4,
-      dashboardUrl,
-      healthUrl,
-      apiSecretCipher,
-      createdAt: new Date().toISOString(),
-    })
-    .run();
+  // Atomically persist provider keys + agent row
+  const keyIds: { provider: string; keyId: string; model: string }[] = [];
+  db.transaction((tx) => {
+    for (const leg of req.modelChain) {
+      const keyId = crypto.randomUUID();
+      const encryptedKey =
+        masterKey && masterKey.length > 0
+          ? encryptSecret(leg.apiKey, masterKey)
+          : leg.apiKey; // fallback: store plaintext if no master key (dev only)
+      tx.insert(providerKeysTable)
+        .values({
+          id: keyId,
+          userId: req.userId,
+          provider: leg.provider,
+          label: null,
+          encryptedKey,
+          createdAt: new Date().toISOString(),
+        })
+        .run();
+      keyIds.push({ provider: leg.provider, keyId, model: leg.model });
+    }
+
+    tx.insert(agentsTable)
+      .values({
+        id: agentId,
+        userId: req.userId,
+        hostname: req.hostname,
+        serverId,
+        ipv4,
+        dashboardUrl,
+        healthUrl,
+        apiSecretCipher,
+        modelChainConfig: JSON.stringify(keyIds),
+        createdAt: new Date().toISOString(),
+      })
+      .run();
+  });
 
   // Verify user still exists (sanity check for FK)
   const user = db.select().from(users).where(eq(users.id, req.userId)).get();

@@ -19,6 +19,12 @@ import { createHetznerDnsARecord, HetznerClient } from "../../src/lib/hetzner";
 import { getDb, users, agents as agentsTable } from "../../src/lib/db";
 import { encryptSecret } from "../../src/lib/encryption";
 
+const ModelChainLegSchema = z.object({
+  provider: z.string().min(1),
+  apiKey: z.string().min(1),
+  model: z.string().min(1),
+});
+
 const RequestSchema = z.object({
   hostname: z.string().min(1).max(63),
   /** Email of the console user to link this agent to. */
@@ -26,10 +32,14 @@ const RequestSchema = z.object({
   extensionIds: z.array(z.string()).default([]),
   /** Override MERCURY_EXTENSIONS_REPO for this run (GitHub `owner/repo` with `examples/extensions/` on default branch). */
   extensionsRepo: z.string().min(1).optional(),
+  /**
+   * Ordered model chain: first entry is primary, rest are fallbacks.
+   * Example: [{ provider: "anthropic", apiKey: "sk-ant-...", model: "claude-sonnet-4-6" }]
+   */
+  modelChain: z.array(ModelChainLegSchema).min(1),
   secrets: z.object({
-    anthropicApiKey: z.string().min(1),
     apiSecret: z.string().optional(),
-  }),
+  }).optional().default({}),
   optionalEnv: z.record(z.string()).optional().default({}),
 });
 
@@ -135,7 +145,7 @@ async function main() {
     "Michaelliv/mercury";
 
   const apiSecret =
-    req.secrets.apiSecret && req.secrets.apiSecret.length > 0
+    req.secrets?.apiSecret && req.secrets.apiSecret.length > 0
       ? req.secrets.apiSecret
       : randomBytes(24).toString("hex");
 
@@ -144,7 +154,8 @@ async function main() {
   );
 
   const envContent = renderMercuryEnv({
-    anthropicApiKey: req.secrets.anthropicApiKey,
+    resolvedKeys: req.modelChain.map(({ provider, apiKey }) => ({ provider, apiKey })),
+    modelChain: req.modelChain.map(({ provider, model }) => ({ provider, model })),
     apiSecret,
     agentImage,
     optionalLines,

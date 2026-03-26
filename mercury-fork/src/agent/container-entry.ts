@@ -539,7 +539,11 @@ function invokePiOnce(
         reject(new Error(parsed.piFailureMessage));
         return;
       }
-      resolve({ reply: parsed.reply, usage: parsed.usage });
+      resolve({
+        reply: parsed.reply,
+        usage: parsed.usage,
+        hadToolLeakage: parsed.hadToolLeakage,
+      });
     });
   });
 }
@@ -580,7 +584,20 @@ async function runModelChain(payload: Payload): Promise<PiJsonlParseResult> {
             'provider "cursor" is no longer supported. Use the model\'s native provider instead (e.g. provider: anthropic for Claude, provider: openai for GPT). See docs/configuration.md.',
           );
         }
-        return await invokePiOnce(payload, provider, model, legCaps);
+        const result = await invokePiOnce(payload, provider, model, legCaps);
+        // If the model leaked a tool call as raw text instead of executing it,
+        // retry this leg with tools disabled so we get a clean text-only reply.
+        if (
+          result.hadToolLeakage &&
+          legCaps.tools &&
+          Date.now() - started <= budgetMs
+        ) {
+          return await invokePiOnce(payload, provider, model, {
+            ...legCaps,
+            tools: false,
+          });
+        }
+        return result;
       } catch (e) {
         const err = e instanceof Error ? e : new Error(String(e));
         lastErr = err;

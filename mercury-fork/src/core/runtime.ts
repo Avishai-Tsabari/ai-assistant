@@ -460,6 +460,10 @@ export class MercuryCoreRuntime {
         }
       }
 
+      // Fetch prior completed turns BEFORE storing the current message,
+      // so the current prompt doesn't appear twice (once in history, once as prompt).
+      const history = this.db.getRecentTurns(spaceId, 10);
+
       const userMessageId = this.db.addMessage(
         spaceId,
         "user",
@@ -513,8 +517,6 @@ export class MercuryCoreRuntime {
           }
         }
       }
-
-      const history = this.db.getRecentTurns(spaceId, 10);
 
       const startTime = Date.now();
 

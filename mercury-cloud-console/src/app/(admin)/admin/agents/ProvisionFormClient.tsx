@@ -1,9 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { KNOWN_PROVIDERS } from "@/lib/providers";
 
 type UserOption = { id: string; email: string };
 type ExtOption = { id: string; display_name: string; description: string; monthly_price_usd: number };
+type ModelChainLeg = { provider: string; apiKey: string; model: string };
+
+const PROVIDER_OPTIONS = Object.entries(KNOWN_PROVIDERS);
+
+function emptyLeg(): ModelChainLeg {
+  return { provider: "anthropic", apiKey: "", model: KNOWN_PROVIDERS.anthropic.defaultModel };
+}
 
 export function ProvisionFormClient() {
   const [open, setOpen] = useState(false);
@@ -13,7 +21,7 @@ export function ProvisionFormClient() {
   // Form fields
   const [userId, setUserId] = useState("");
   const [hostname, setHostname] = useState("");
-  const [apiKey, setApiKey] = useState("");
+  const [modelChain, setModelChain] = useState<ModelChainLeg[]>([emptyLeg()]);
   const [selectedExts, setSelectedExts] = useState<string[]>([]);
 
   // SSE state
@@ -42,11 +50,38 @@ export function ProvisionFormClient() {
     }
   }, [log]);
 
+  function updateLeg(index: number, field: keyof ModelChainLeg, value: string) {
+    setModelChain((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      // Auto-fill default model when provider changes
+      if (field === "provider" && KNOWN_PROVIDERS[value]) {
+        next[index].model = KNOWN_PROVIDERS[value].defaultModel;
+      }
+      return next;
+    });
+  }
+
+  function addLeg() {
+    setModelChain((prev) => [...prev, emptyLeg()]);
+  }
+
+  function removeLeg(index: number) {
+    setModelChain((prev) => prev.filter((_, i) => i !== index));
+  }
+
   function toggleExt(id: string) {
     setSelectedExts((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   }
+
+  const canSubmit =
+    !running &&
+    !!userId &&
+    !!hostname &&
+    modelChain.length > 0 &&
+    modelChain.every((l) => l.provider && l.apiKey.trim() && l.model.trim());
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -63,7 +98,11 @@ export function ProvisionFormClient() {
         body: JSON.stringify({
           userId,
           hostname: hostname.trim(),
-          anthropicApiKey: apiKey.trim(),
+          modelChain: modelChain.map((l) => ({
+            provider: l.provider,
+            apiKey: l.apiKey.trim(),
+            model: l.model.trim(),
+          })),
           extensionIds: selectedExts,
         }),
       });
@@ -176,18 +215,87 @@ export function ProvisionFormClient() {
               />
             </label>
 
-            <label style={{ display: "block", marginBottom: "0.75rem" }}>
-              <div className="muted">Anthropic API Key</div>
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                required
-                autoComplete="off"
-                style={{ width: "100%" }}
+            <div style={{ marginBottom: "0.75rem" }}>
+              <div className="muted" style={{ marginBottom: "0.5rem" }}>
+                Model Chain{" "}
+                <span style={{ fontWeight: 400 }}>
+                  (ordered list of providers; first is primary, rest are fallbacks)
+                </span>
+              </div>
+              {modelChain.map((leg, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 2fr 1.5fr auto",
+                    gap: "0.5rem",
+                    marginBottom: "0.5rem",
+                    alignItems: "end",
+                  }}
+                >
+                  <div>
+                    {i === 0 && <div className="muted" style={{ fontSize: "0.8rem", marginBottom: "0.2rem" }}>Provider</div>}
+                    <select
+                      value={leg.provider}
+                      onChange={(e) => updateLeg(i, "provider", e.target.value)}
+                      style={{ width: "100%" }}
+                      disabled={running}
+                    >
+                      {PROVIDER_OPTIONS.map(([id, meta]) => (
+                        <option key={id} value={id}>{meta.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    {i === 0 && <div className="muted" style={{ fontSize: "0.8rem", marginBottom: "0.2rem" }}>API Key</div>}
+                    <input
+                      type="password"
+                      value={leg.apiKey}
+                      onChange={(e) => updateLeg(i, "apiKey", e.target.value)}
+                      placeholder={KNOWN_PROVIDERS[leg.provider]?.placeholder ?? "..."}
+                      required
+                      autoComplete="off"
+                      style={{ width: "100%" }}
+                      disabled={running}
+                    />
+                  </div>
+                  <div>
+                    {i === 0 && <div className="muted" style={{ fontSize: "0.8rem", marginBottom: "0.2rem" }}>Model</div>}
+                    <input
+                      type="text"
+                      value={leg.model}
+                      onChange={(e) => updateLeg(i, "model", e.target.value)}
+                      placeholder={KNOWN_PROVIDERS[leg.provider]?.defaultModel ?? "model-name"}
+                      required
+                      style={{ width: "100%" }}
+                      disabled={running}
+                    />
+                  </div>
+                  <div>
+                    {i === 0 && <div style={{ fontSize: "0.8rem", marginBottom: "0.2rem", visibility: "hidden" }}>x</div>}
+                    {modelChain.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeLeg(i)}
+                        disabled={running}
+                        style={{ background: "none", border: "1px solid var(--border)", cursor: "pointer", padding: "0.35rem 0.6rem", borderRadius: "4px" }}
+                        title="Remove this leg"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addLeg}
                 disabled={running}
-              />
-            </label>
+                style={{ fontSize: "0.85rem", marginTop: "0.25rem" }}
+              >
+                + Add fallback
+              </button>
+            </div>
 
             {extensions.length > 0 && (
               <div style={{ marginBottom: "0.75rem" }}>
@@ -211,7 +319,7 @@ export function ProvisionFormClient() {
               </div>
             )}
 
-            <button type="submit" disabled={running || !userId || !hostname || !apiKey}>
+            <button type="submit" disabled={!canSubmit}>
               {running ? "Provisioning…" : "Provision"}
             </button>
           </form>

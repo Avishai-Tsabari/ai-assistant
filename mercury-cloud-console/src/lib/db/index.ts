@@ -37,6 +37,14 @@ function bootstrap(sqlite: Database.Database) {
       status TEXT NOT NULL DEFAULT 'inactive',
       updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS provider_keys (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      provider TEXT NOT NULL,
+      label TEXT,
+      encrypted_key TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
   `);
 
   // Migration: add role column to existing users table
@@ -49,6 +57,13 @@ function bootstrap(sqlite: Database.Database) {
   // Migration: add deprovisioned_at column to existing agents table
   try {
     sqlite.exec(`ALTER TABLE agents ADD COLUMN deprovisioned_at TEXT`);
+  } catch {
+    // Column already exists — ignore
+  }
+
+  // Migration: add model_chain_config column to agents
+  try {
+    sqlite.exec(`ALTER TABLE agents ADD COLUMN model_chain_config TEXT`);
   } catch {
     // Column already exists — ignore
   }

@@ -22,14 +22,6 @@ model:
       model: meta-llama/llama-3.3-70b-instruct
 
 
-compaction:
-  keep_recent_tokens: 2000 # Use ~4000 for Groq 8b (6k TPM limit) to avoid "Request too large" errors.
-
-# Conditional context: use minimal session for standalone prompts (reduces tokens).
-conditional_context:
-  enabled: true
-  classifier: llm
-
 ingress:
   whatsapp: false
   slack: false

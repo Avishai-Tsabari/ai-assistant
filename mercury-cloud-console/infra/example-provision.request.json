@@ -1,8 +1,15 @@
 {
   "hostname": "mercury-demo-1",
+  "userEmail": "you@example.com",
+  "modelChain": [
+    {
+      "provider": "anthropic",
+      "apiKey": "sk-ant-REPLACE_ME",
+      "model": "claude-sonnet-4-6"
+    }
+  ],
   "extensionIds": [],
   "secrets": {
-    "anthropicApiKey": "REPLACE_ME",
     "apiSecret": ""
   },
   "optionalEnv": {}

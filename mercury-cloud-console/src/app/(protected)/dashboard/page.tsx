@@ -46,6 +46,8 @@ export default async function DashboardPage() {
         )}
       </div>
       <p style={{ marginTop: "1rem" }}>
+        <Link href="/dashboard/keys">Manage API Keys</Link>
+        {" · "}
         <Link href="/onboarding">Onboarding checklist</Link>
       </p>
       {session!.user!.role === "admin" && (
@@ -53,9 +55,6 @@ export default async function DashboardPage() {
           <Link href="/admin">Admin Console</Link>
         </p>
       )}
-      <p className="muted" style={{ marginTop: "1.5rem" }}>
-        <Link href="/dashboard">Dashboard</Link> · Automated provision from the UI is the next iteration.
-      </p>
     </main>
   );
 }

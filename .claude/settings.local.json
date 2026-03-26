@@ -44,7 +44,14 @@
       "Bash(bun:*)",
       "Bash(sqlite3:*)",
       "Bash(git log:*)",
-      "Bash(find /c/code/agentic/mercury/mercury-fork/tests -name *.test.ts)"
+      "Bash(find /c/code/agentic/mercury/mercury-fork/tests -name *.test.ts)",
+      "Bash(find C:codeagenticmercury.mercury -type f -name *.md)",
+      "Bash(pi --help)",
+      "Bash(find /c/code/agentic/mercury/docs -name *.md -type f)",
+      "Bash(find /c/code/agentic/mercury/mercury-fork -name *.md -type f)",
+      "Bash(mkdir -p \"C:/code/agentic/mercury/mercury-cloud-console/src/app/api/user/keys/[id]\")",
+      "Bash(mkdir -p \"C:/code/agentic/mercury/mercury-cloud-console/src/app/api/user/agents/[id]/model-config\")",
+      "Bash(grep -E \"\\\\.\\(ts|js|json\\)$\")"
     ]
   }
 }

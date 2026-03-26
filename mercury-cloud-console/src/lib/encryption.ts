@@ -20,6 +20,10 @@ export function encryptSecret(plain: string, masterKeyHex: string): string {
   return Buffer.concat([iv, tag, enc]).toString("hex");
 }
 
+export function getMasterKey(): string | null {
+  return process.env.CONSOLE_ENCRYPTION_MASTER_KEY ?? null;
+}
+
 export function decryptSecret(cipherHex: string, masterKeyHex: string): string {
   const key = keyFromMaster(masterKeyHex);
   const buf = Buffer.from(cipherHex, "hex");

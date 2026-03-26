@@ -33,6 +33,14 @@ export function classifyPiFailure(text: string): PiFailureClass {
     return "fallbackable";
   }
 
+  if (
+    /tool\s+call\s+validation\s+failed|attempted\s+to\s+call\s+tool.*which\s+was\s+not\s+in\s+request\.tools/i.test(
+      text,
+    )
+  ) {
+    return "fallbackable";
+  }
+
   if (/\b429\b|rate[_\s]+limit/i.test(text)) {
     return "fallbackable";
   }
