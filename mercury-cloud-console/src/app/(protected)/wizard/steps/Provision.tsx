@@ -29,7 +29,6 @@ export default function Provision() {
     async function run() {
       try {
         const body = {
-          hostname: state.hostname,
           modelChain: state.modelChain.map((leg) => ({
             keyId: leg.keyId,
             model: leg.model,
@@ -138,8 +137,7 @@ export default function Provision() {
 
       {!error && !done && (
         <p className="muted" style={{ marginTop: 0 }}>
-          Please wait while your agent server is being set up. This may take
-          several minutes.
+          Setting up your agent — this usually takes a few seconds.
         </p>
       )}
 
@@ -186,7 +184,7 @@ export default function Provision() {
           <button
             type="button"
             onClick={() => {
-              dispatch({ type: "SET_STEP", step: 4 });
+              dispatch({ type: "SET_STEP", step: 3 });
             }}
           >
             ← Try Again

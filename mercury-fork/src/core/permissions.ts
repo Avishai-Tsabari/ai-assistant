@@ -8,6 +8,7 @@ const BUILT_IN_PERMISSIONS = new Set([
   "prompt",
   "stop",
   "compact",
+  "clear",
   "tasks.list",
   "tasks.create",
   "tasks.pause",

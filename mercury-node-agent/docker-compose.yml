@@ -1,0 +1,57 @@
+# Mercury Compute Node — Docker Compose
+#
+# Runs Traefik (reverse proxy) and the node agent on a compute node.
+# Agent containers are started dynamically by the node agent and join
+# the same "mercury-net" Docker network for Traefik routing.
+#
+# Required env vars (set in .env or shell):
+#   NODE_AGENT_TOKEN        — shared secret for control plane auth
+#   NODE_AGENT_BASE_DOMAIN  — e.g. "mercury.app"
+#   ACME_EMAIL              — email for Let's Encrypt certificate registration
+#   HETZNER_DNS_API_TOKEN   — Hetzner DNS API token for wildcard TLS certs
+#
+# Optional:
+#   NODE_AGENT_PORT         — node agent port (default: 9090)
+#   NODE_AGENT_DEFAULT_MEMORY_MB — default agent memory limit (default: 512)
+
+services:
+  traefik:
+    image: traefik:v3.3
+    container_name: mercury-traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - letsencrypt:/letsencrypt
+    environment:
+      - HETZNER_API_KEY=${HETZNER_DNS_API_TOKEN}
+      - ACME_EMAIL=${ACME_EMAIL}
+    networks:
+      - mercury-net
+
+  node-agent:
+    build: .
+    container_name: mercury-node-agent
+    restart: unless-stopped
+    ports:
+      - "${NODE_AGENT_PORT:-9090}:${NODE_AGENT_PORT:-9090}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - NODE_AGENT_TOKEN=${NODE_AGENT_TOKEN}
+      - NODE_AGENT_PORT=${NODE_AGENT_PORT:-9090}
+      - NODE_AGENT_BASE_DOMAIN=${NODE_AGENT_BASE_DOMAIN:-mercury.app}
+      - NODE_AGENT_DOCKER_NETWORK=mercury-net
+    networks:
+      - mercury-net
+
+volumes:
+  letsencrypt:
+
+networks:
+  mercury-net:
+    name: mercury-net
+    driver: bridge

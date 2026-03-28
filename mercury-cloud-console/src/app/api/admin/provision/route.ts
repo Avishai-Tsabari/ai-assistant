@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { assertAdminOrThrow } from "@/lib/admin-guard";
 import { getDb, users } from "@/lib/db";
 import { provisionAgent } from "@/lib/provisioner";
+import { provisionAgentContainer } from "@/lib/container-provisioner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,7 +64,14 @@ export async function POST(request: Request) {
       }
 
       try {
-        const gen = provisionAgent({
+        const useContainerMode =
+          process.env.PROVISIONER_MODE === "container";
+
+        const provisionFn = useContainerMode
+          ? provisionAgentContainer
+          : provisionAgent;
+
+        const gen = provisionFn({
           userId: userId as string,
           hostname: hostname as string,
           modelChain: modelChain as { provider: string; apiKey: string; model: string }[],

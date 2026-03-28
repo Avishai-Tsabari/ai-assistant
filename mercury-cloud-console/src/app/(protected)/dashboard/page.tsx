@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { agents } from "@/lib/db/schema";
 import SignOutButton from "./SignOutButton";
+import AgentCard from "./AgentCard";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -13,6 +14,8 @@ export default async function DashboardPage() {
     .from(agents)
     .where(eq(agents.userId, userId))
     .all();
+
+  const activeAgents = rows.filter((a) => !a.deprovisionedAt);
 
   return (
     <main>
@@ -28,24 +31,26 @@ export default async function DashboardPage() {
             <button type="button">+ Provision New Agent</button>
           </Link>
         </div>
-        {rows.length === 0 ? (
+        {activeAgents.length === 0 ? (
           <p className="muted">
             No agents linked yet.{" "}
             <Link href="/wizard">Launch the setup wizard</Link> to provision your first agent.
           </p>
         ) : (
-          <ul style={{ paddingLeft: "1.25rem" }}>
-            {rows.map((a) => (
-              <li key={a.id} style={{ marginBottom: "0.75rem" }}>
-                <strong>{a.hostname}</strong>
-                {a.dashboardUrl ? (
-                  <>
-                    {" "}
-                    — <Link href={a.dashboardUrl}>dashboard</Link>
-                  </>
-                ) : null}
-                {a.ipv4 ? <span className="muted"> ({a.ipv4})</span> : null}
-              </li>
+          <ul style={{ padding: 0, margin: 0 }}>
+            {activeAgents.map((a) => (
+              <AgentCard
+                key={a.id}
+                agent={{
+                  id: a.id,
+                  hostname: a.hostname,
+                  ipv4: a.ipv4 ?? null,
+                  dashboardUrl: a.dashboardUrl ?? null,
+                  nodeId: a.nodeId ?? null,
+                  containerStatus: (a.containerStatus as "running" | "stopped" | "restarting" | "failed" | null) ?? null,
+                  deprovisionedAt: a.deprovisionedAt ?? null,
+                }}
+              />
             ))}
           </ul>
         )}

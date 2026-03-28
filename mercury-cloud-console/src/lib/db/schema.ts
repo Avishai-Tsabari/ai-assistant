@@ -1,5 +1,33 @@
 import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
+/* ───────────────────────── Multi-tenant compute ──────────────────────── */
+
+/** Compute nodes that run agent containers. */
+export const computeNodes = sqliteTable("compute_nodes", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  /** Human-readable label, e.g. "hetzner-ax42-nbg1" */
+  label: text("label").notNull(),
+  /** IP or hostname of the compute node */
+  host: text("host").notNull(),
+  /** Full URL to the node agent HTTP daemon, e.g. "http://10.0.0.1:9090" */
+  apiUrl: text("api_url").notNull(),
+  /** Shared secret for authenticating with the node agent */
+  apiToken: text("api_token").notNull(),
+  /** Maximum number of agent containers allowed on this node */
+  maxAgents: integer("max_agents").notNull().default(100),
+  /** active = accepting new agents, draining = no new agents, offline = unreachable */
+  status: text("status", {
+    enum: ["active", "draining", "offline"],
+  })
+    .notNull()
+    .default("active"),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
 export const users = sqliteTable("users", {
   id: text("id")
     .primaryKey()
@@ -17,9 +45,28 @@ export const agents = sqliteTable("agents", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+  /** Agent hostname — auto-generated for container mode, user-provided for VPS mode */
   hostname: text("hostname").notNull(),
+
+  /* ── VPS mode fields (legacy, nullable) ────────────────────────────── */
   serverId: integer("server_id"),
   ipv4: text("ipv4"),
+
+  /* ── Container mode fields ─────────────────────────────────────────── */
+  /** Compute node this agent runs on (null for VPS-provisioned agents) */
+  nodeId: text("node_id").references(() => computeNodes.id),
+  /** Docker container ID on the compute node */
+  containerId: text("container_id"),
+  /** Host port mapped to the container's 8787 (may be null if Traefik routes internally) */
+  containerPort: integer("container_port"),
+  /** Current container lifecycle state */
+  containerStatus: text("container_status", {
+    enum: ["running", "stopped", "restarting", "failed"],
+  }),
+  /** Docker image tag deployed to this agent, e.g. "0.4.5" or "latest" */
+  imageTag: text("image_tag"),
+
+  /* ── Common fields ─────────────────────────────────────────────────── */
   dashboardUrl: text("dashboard_url"),
   healthUrl: text("health_url"),
   /** AES-GCM ciphertext (hex) of MERCURY_API_SECRET for remote calls */
@@ -180,6 +227,27 @@ export const alertNotifications = sqliteTable("alert_notifications", {
   })
     .notNull()
     .default("immediate"),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
+/* ───────────────────────── Container audit log ───────────────────────── */
+
+/** Audit log of container lifecycle events for debugging and observability. */
+export const containerEvents = sqliteTable("container_events", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  agentId: text("agent_id")
+    .notNull()
+    .references(() => agents.id, { onDelete: "cascade" }),
+  /** Lifecycle event type */
+  event: text("event", {
+    enum: ["started", "stopped", "restarted", "failed", "updated"],
+  }).notNull(),
+  /** Optional JSON blob with event-specific details (e.g. error message, old/new image tag) */
+  details: text("details"),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),

@@ -155,6 +155,10 @@ export function createApp(ctx: ServerContext): Hono {
     }
     return c.json({
       status: "ok",
+      version:
+        process.env.MERCURY_VERSION ??
+        process.env.npm_package_version ??
+        "unknown",
       uptime: uptimeSeconds,
       queue: {
         active: core.queue.activeCount,

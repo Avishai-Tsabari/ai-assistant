@@ -10,7 +10,10 @@ Three independent packages (no workspace links — each manages its own dependen
 | `mercury-cloud-console/` | Admin console — provisioning, user auth, agent management | Next.js 15, React 19, Drizzle ORM |
 | `mercury-assistant/` | Reference Mercury project (config only — no code changes here) | mercury.yaml + .env |
 
-Each package has its own `CLAUDE.md` with package-specific details.
+Each package has its own `CLAUDE.md` with package-specific details. Import them when working in that package:
+
+- @mercury-fork/CLAUDE.md
+- @mercury-cloud-console/CLAUDE.md
 
 ## Commands
 
@@ -18,13 +21,18 @@ Run from the relevant package directory:
 
 ```bash
 # mercury-fork
-cd mercury-fork && bun run check      # typecheck + lint + test (run before PR)
+cd mercury-fork && bun run check      # typecheck + lint + test
 cd mercury-fork && bun run check:fix  # same but auto-fix lint issues
 
 # mercury-cloud-console
 cd mercury-cloud-console && bun run typecheck   # TypeScript only (no test suite yet)
 cd mercury-cloud-console && bun run build       # Next.js production build
 ```
+
+## Definition of Done
+
+- **mercury-fork**: A task is complete only after `bun run check` passes with no errors.
+- **mercury-cloud-console**: A task is complete only after `bun run typecheck` passes with no errors.
 
 ## Code Style
 
@@ -37,7 +45,6 @@ cd mercury-cloud-console && bun run build       # Next.js production build
 - **Commits**: `feat(scope):`, `fix(scope):`, `docs:`, `refactor:`, `chore:` — scope is `fork`, `console`, etc.
 - **Branches**: `issue-<num>-<slug>` for GitHub issues
 
-
 ## Safety Rules
 
 - **Never commit `.env` files** or secrets (API keys, tokens, passwords)
@@ -46,4 +53,7 @@ cd mercury-cloud-console && bun run build       # Next.js production build
 
 ## Planning Workflow
 
-When entering plan mode for a new feature or task, first invoke the `product-planning` skill to create a PRD and feature spec before proceeding with implementation planning.
+When starting a new feature or non-trivial task:
+
+1. Invoke the `product-planning` skill to produce a PRD and feature spec (outputs to `prds/` or `docs/prd/`)
+2. Use the PRD to drive implementation planning before writing any code

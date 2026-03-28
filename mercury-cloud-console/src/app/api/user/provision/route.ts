@@ -6,6 +6,7 @@ import { assertUserOrThrow } from "@/lib/admin-guard";
 import { getDb, providerKeys } from "@/lib/db";
 import { decryptSecret, encryptSecret, getMasterKey } from "@/lib/encryption";
 import { provisionAgent } from "@/lib/provisioner";
+import { provisionAgentContainer } from "@/lib/container-provisioner";
 import { oauthEnvVar } from "@/lib/providers";
 import { refreshOAuthCredentials, type OAuthCredentials } from "@/lib/oauth";
 
@@ -18,11 +19,22 @@ const ModelChainLegSchema = z.object({
 });
 
 const BodySchema = z.object({
-  hostname: z.string().min(3).max(64).regex(/^[a-z0-9-]+$/, "Hostname must be lowercase letters, numbers, and hyphens"),
+  // Hostname is optional in container mode — auto-generated if omitted.
+  // Required (min 3 chars) in VPS mode.
+  hostname: z.string().max(64).regex(/^[a-z0-9-]*$/, "Hostname must be lowercase letters, numbers, and hyphens").optional().default(""),
   modelChain: z.array(ModelChainLegSchema).min(1),
   extensionIds: z.array(z.string()).optional().default([]),
   optionalEnv: z.record(z.string(), z.string()).optional().default({}),
-});
+}).refine(
+  (data) => {
+    // In VPS mode, hostname is required
+    if (process.env.PROVISIONER_MODE !== "container") {
+      return data.hostname.length >= 3;
+    }
+    return true;
+  },
+  { message: "Hostname is required (min 3 characters) in VPS provisioning mode", path: ["hostname"] },
+);
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -130,13 +142,24 @@ export async function POST(request: Request) {
       }
 
       try {
-        const gen = provisionAgent({
-          userId,
-          hostname,
-          modelChain: resolvedChain,
-          extensionIds,
-          optionalEnv,
-        });
+        const useContainerMode =
+          process.env.PROVISIONER_MODE === "container";
+
+        const gen = useContainerMode
+          ? provisionAgentContainer({
+              userId,
+              hostname,
+              modelChain: resolvedChain,
+              extensionIds,
+              optionalEnv,
+            })
+          : provisionAgent({
+              userId,
+              hostname,
+              modelChain: resolvedChain,
+              extensionIds,
+              optionalEnv,
+            });
 
         for await (const ev of gen) {
           if (ev.type === "progress") {

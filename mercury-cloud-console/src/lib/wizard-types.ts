@@ -5,6 +5,5 @@ export type WizardState = {
   providerKeys: Array<{ id: string; provider: string; label: string }>;
   modelChain: ModelChainLeg[];
   extensionIds: string[];
-  hostname: string;
   optionalEnv: Record<string, string>;
 };

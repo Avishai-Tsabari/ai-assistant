@@ -17,6 +17,7 @@ export type RouteResult =
 const CHAT_COMMANDS: Record<string, string> = {
   stop: "stop",
   compact: "compact",
+  clear: "clear",
 };
 
 export function routeInput(input: {

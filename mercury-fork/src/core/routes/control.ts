@@ -33,3 +33,14 @@ control.post("/compact", (c) => {
 
   return c.json({ spaceId, boundary });
 });
+
+control.post("/clear", (c) => {
+  const { spaceId } = getAuth(c);
+  const denied = checkPerm(c, "clear");
+  if (denied) return denied;
+
+  const { db } = getApiCtx(c);
+  const boundary = db.setClearBoundary(spaceId);
+
+  return c.json({ spaceId, boundary });
+});

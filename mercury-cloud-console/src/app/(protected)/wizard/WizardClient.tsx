@@ -6,11 +6,10 @@ import Welcome from "./steps/Welcome";
 import AddKeys from "./steps/AddKeys";
 import ModelChain from "./steps/ModelChain";
 import Extensions from "./steps/Extensions";
-import AgentConfig from "./steps/AgentConfig";
 import Provision from "./steps/Provision";
 import Success from "./steps/Success";
 
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 6;
 
 export type WizardAction =
   | { type: "NEXT_STEP" }
@@ -19,7 +18,6 @@ export type WizardAction =
   | { type: "SET_KEYS"; keys: WizardState["providerKeys"] }
   | { type: "SET_MODEL_CHAIN"; modelChain: ModelChainLeg[] }
   | { type: "SET_EXTENSION_IDS"; extensionIds: string[] }
-  | { type: "SET_HOSTNAME"; hostname: string }
   | { type: "SET_OPTIONAL_ENV"; optionalEnv: Record<string, string> }
   | { type: "RESET" };
 
@@ -28,7 +26,6 @@ const initialState: WizardState = {
   providerKeys: [],
   modelChain: [],
   extensionIds: [],
-  hostname: "",
   optionalEnv: {},
 };
 
@@ -46,8 +43,6 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
       return { ...state, modelChain: action.modelChain };
     case "SET_EXTENSION_IDS":
       return { ...state, extensionIds: action.extensionIds };
-    case "SET_HOSTNAME":
-      return { ...state, hostname: action.hostname };
     case "SET_OPTIONAL_ENV":
       return { ...state, optionalEnv: action.optionalEnv };
     case "RESET":
@@ -75,7 +70,6 @@ const STEP_LABELS = [
   "Add Keys",
   "Model Chain",
   "Extensions",
-  "Agent Config",
   "Provision",
   "Done",
 ];
@@ -88,7 +82,6 @@ export default function WizardClient() {
     <AddKeys key="addkeys" />,
     <ModelChain key="modelchain" />,
     <Extensions key="extensions" />,
-    <AgentConfig key="agentconfig" />,
     <Provision key="provision" />,
     <Success key="success" />,
   ];

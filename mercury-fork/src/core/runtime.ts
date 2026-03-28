@@ -285,6 +285,10 @@ export class MercuryCoreRuntime {
         this.db.setSessionBoundaryToLatest(spaceId);
         return "Compacted.";
       }
+      case "clear": {
+        this.db.setClearBoundary(spaceId);
+        return "Cleared.";
+      }
       default:
         return `Unknown command: ${command}`;
     }
@@ -463,6 +467,8 @@ export class MercuryCoreRuntime {
       // Fetch prior completed turns BEFORE storing the current message,
       // so the current prompt doesn't appear twice (once in history, once as prompt).
       const history = this.db.getRecentTurns(spaceId, 10);
+      // One-shot clear: reset temporary boundary immediately after reading history.
+      this.db.resetClearBoundary(spaceId);
 
       const userMessageId = this.db.addMessage(
         spaceId,

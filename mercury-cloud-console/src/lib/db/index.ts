@@ -129,6 +129,54 @@ function bootstrap(sqlite: Database.Database) {
     // Table already exists — ignore
   }
 
+  // Migration: create compute_nodes table
+  try {
+    sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS compute_nodes (
+        id TEXT PRIMARY KEY NOT NULL,
+        label TEXT NOT NULL,
+        host TEXT NOT NULL,
+        api_url TEXT NOT NULL,
+        api_token TEXT NOT NULL,
+        max_agents INTEGER NOT NULL DEFAULT 100,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL
+      )
+    `);
+  } catch {
+    // Table already exists — ignore
+  }
+
+  // Migration: add container-mode columns to agents table
+  for (const col of [
+    "ALTER TABLE agents ADD COLUMN node_id TEXT REFERENCES compute_nodes(id)",
+    "ALTER TABLE agents ADD COLUMN container_id TEXT",
+    "ALTER TABLE agents ADD COLUMN container_port INTEGER",
+    "ALTER TABLE agents ADD COLUMN container_status TEXT",
+    "ALTER TABLE agents ADD COLUMN image_tag TEXT",
+  ]) {
+    try {
+      sqlite.exec(col);
+    } catch {
+      // Column already exists — ignore
+    }
+  }
+
+  // Migration: create container_events audit log
+  try {
+    sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS container_events (
+        id TEXT PRIMARY KEY NOT NULL,
+        agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+        event TEXT NOT NULL,
+        details TEXT,
+        created_at TEXT NOT NULL
+      )
+    `);
+  } catch {
+    // Table already exists — ignore
+  }
+
   // Promote ADMIN_EMAIL to admin role (idempotent, runs once per process on DB init)
   const adminEmail = process.env.ADMIN_EMAIL?.trim();
   if (adminEmail) {

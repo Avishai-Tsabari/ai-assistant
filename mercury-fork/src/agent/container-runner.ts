@@ -203,7 +203,10 @@ export class AgentContainerRunner {
   private generateContainerName(): string {
     const id = ++this.containerCounter;
     const timestamp = Date.now();
-    return `mercury-${timestamp}-${id}`;
+    const agentId = process.env.MERCURY_AGENT_ID;
+    return agentId
+      ? `mercury-${agentId}-${timestamp}-${id}`
+      : `mercury-${timestamp}-${id}`;
   }
 
   async reply(input: {

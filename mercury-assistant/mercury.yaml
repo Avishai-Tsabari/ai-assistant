@@ -46,6 +46,7 @@ runtime:
 agent:
   image: mercury-agent:latest
   container_bwrap_docker_compat: true
+  container_timeout_ms: 600000
 
 permissions:
   admins: "telegram:1400791156"

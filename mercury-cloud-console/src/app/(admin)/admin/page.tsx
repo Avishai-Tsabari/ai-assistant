@@ -5,17 +5,27 @@ import { getDb } from "@/lib/db";
 export default function AdminOverviewPage() {
   const db = getDb();
 
-  const stats = db.get<{ userCount: number; agentCount: number; activeSubCount: number }>(sql`
+  const stats = db.get<{
+    userCount: number;
+    agentCount: number;
+    activeSubCount: number;
+    nodeCount: number;
+    containerAgentCount: number;
+  }>(sql`
     SELECT
       (SELECT COUNT(*) FROM users) AS userCount,
-      (SELECT COUNT(*) FROM agents) AS agentCount,
-      (SELECT COUNT(*) FROM subscriptions WHERE status = 'active') AS activeSubCount
+      (SELECT COUNT(*) FROM agents WHERE deprovisioned_at IS NULL) AS agentCount,
+      (SELECT COUNT(*) FROM subscriptions WHERE status = 'active') AS activeSubCount,
+      (SELECT COUNT(*) FROM compute_nodes WHERE status = 'active') AS nodeCount,
+      (SELECT COUNT(*) FROM agents WHERE node_id IS NOT NULL AND deprovisioned_at IS NULL) AS containerAgentCount
   `)!;
 
   const cards = [
     { label: "Total Users", value: stats.userCount, href: "/admin/users" },
-    { label: "Total Agents", value: stats.agentCount, href: "/admin/agents" },
+    { label: "Active Agents", value: stats.agentCount, href: "/admin/agents" },
     { label: "Active Subscriptions", value: stats.activeSubCount },
+    { label: "Compute Nodes", value: stats.nodeCount, href: "/admin/nodes" },
+    { label: "Container Agents", value: stats.containerAgentCount, href: "/admin/nodes" },
   ];
 
   return (

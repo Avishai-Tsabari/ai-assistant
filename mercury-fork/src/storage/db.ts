@@ -184,6 +184,7 @@ export class Db {
       ON token_usage(space_id, created_at);
     `);
     this.ensureMessagesRunMetaColumn();
+    this.ensureChatStateClearBoundaryColumn();
   }
 
   private ensureMessagesRunMetaColumn(): void {
@@ -192,6 +193,16 @@ export class Db {
     }[];
     if (cols.some((c) => c.name === "run_meta")) return;
     this.db.exec("ALTER TABLE messages ADD COLUMN run_meta TEXT");
+  }
+
+  private ensureChatStateClearBoundaryColumn(): void {
+    const cols = this.db.query("PRAGMA table_info(chat_state)").all() as {
+      name: string;
+    }[];
+    if (cols.some((c) => c.name === "clear_boundary")) return;
+    this.db.exec(
+      "ALTER TABLE chat_state ADD COLUMN clear_boundary INTEGER NOT NULL DEFAULT 0",
+    );
   }
 
   private assertValidSpaceId(spaceId: string): void {
@@ -579,7 +590,7 @@ export class Db {
   private getSessionBoundary(spaceId: string): number {
     const row = this.db
       .query(
-        `SELECT min_message_id as minMessageId
+        `SELECT max(min_message_id, clear_boundary) as minMessageId
          FROM chat_state
          WHERE space_id = ?`,
       )
@@ -608,6 +619,38 @@ export class Db {
       .run(spaceId, minMessageId, now, now);
 
     return minMessageId;
+  }
+
+  setClearBoundary(spaceId: string): number {
+    const row = this.db
+      .query(
+        `SELECT COALESCE(MAX(id), 0) as id
+         FROM messages
+         WHERE space_id = ?`,
+      )
+      .get(spaceId) as { id: number } | null;
+    const clearBoundary = Number(row?.id ?? 0);
+
+    const now = Date.now();
+    this.db
+      .query(
+        `INSERT INTO chat_state(space_id, min_message_id, clear_boundary, created_at, updated_at)
+         VALUES (?, 0, ?, ?, ?)
+         ON CONFLICT(space_id)
+         DO UPDATE SET clear_boundary = excluded.clear_boundary, updated_at = excluded.updated_at`,
+      )
+      .run(spaceId, clearBoundary, now, now);
+
+    return clearBoundary;
+  }
+
+  resetClearBoundary(spaceId: string): void {
+    this.db
+      .query(
+        `UPDATE chat_state SET clear_boundary = 0, updated_at = ?
+         WHERE space_id = ? AND clear_boundary != 0`,
+      )
+      .run(Date.now(), spaceId);
   }
 
   getRecentMessages(spaceId: string, limit = 40): StoredMessage[] {

@@ -115,7 +115,18 @@
       "WebFetch(domain:www.kayak.com)",
       "WebFetch(domain:www.skyscanner.com)",
       "WebFetch(domain:www.flightsfrom.com)",
-      "Bash(find /c/code/agentic/mercury -type f \\\\\\(-name *web* -o -name *search* -o -name *browser* \\\\\\))"
+      "Bash(find /c/code/agentic/mercury -type f \\\\\\(-name *web* -o -name *search* -o -name *browser* \\\\\\))",
+      "Bash(find /c/code/agentic/mercury/mercury-cloud-console/prds -type f -name *.md)",
+      "Bash(grep -E \"^/c/code/agentic/mercury/\\(mercury-fork|mercury-cloud-console|mercury-assistant\\)/package.json$\")",
+      "Bash(grep -r \"export.*async.*function\" /c/code/agentic/mercury/mercury-cloud-console/src/lib/*.ts)",
+      "Bash(gh repo:*)",
+      "Bash(gh api:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(find /c/code/agentic/mercury/.claude -not -path */worktrees/* -type f)",
+      "Read(//mnt/c/**)",
+      "Read(//c/code/**)",
+      "Bash(wslpath \"C:\\\\code\\\\agentic\\\\mercury\\\\mercury-cloud-console\")",
+      "Bash(wslpath:*)"
     ]
   }
 }

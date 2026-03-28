@@ -3,17 +3,13 @@
 import { useState } from "react";
 import { useWizard } from "../WizardClient";
 
-const HOSTNAME_RE = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$|^[a-z0-9]{3}$/;
-
-function isValidHostname(h: string): boolean {
-  return h.length >= 3 && h.length <= 30 && HOSTNAME_RE.test(h);
-}
+// NOTE: This step is not currently used in the wizard flow (hostname is now
+// auto-generated for container-mode agents). Kept for reference / VPS mode.
 
 type EnvPair = { key: string; value: string };
 
 export default function AgentConfig() {
   const { state, dispatch } = useWizard();
-  const [hostname, setHostname] = useState(state.hostname);
   const [showEnv, setShowEnv] = useState(
     Object.keys(state.optionalEnv).length > 0,
   );
@@ -23,12 +19,6 @@ export default function AgentConfig() {
       ? entries.map(([key, value]) => ({ key, value }))
       : [{ key: "", value: "" }];
   });
-
-  const hostnameValid = isValidHostname(hostname);
-  const hostnameError =
-    hostname.length > 0 && !hostnameValid
-      ? "Hostname must be 3-30 characters: lowercase letters, numbers, and hyphens only. Cannot start or end with a hyphen."
-      : null;
 
   function updateEnvPair(index: number, field: "key" | "value", val: string) {
     setEnvPairs((prev) =>
@@ -45,7 +35,6 @@ export default function AgentConfig() {
   }
 
   function handleNext() {
-    dispatch({ type: "SET_HOSTNAME", hostname });
     const optionalEnv: Record<string, string> = {};
     for (const pair of envPairs) {
       if (pair.key.trim() && pair.value.trim()) {
@@ -59,44 +48,6 @@ export default function AgentConfig() {
   return (
     <div>
       <h2 style={{ marginTop: 0 }}>Agent Configuration</h2>
-      <p className="muted" style={{ marginTop: 0 }}>
-        Choose a hostname for your agent server. This will be used as the server
-        name in Hetzner and optionally as a DNS record.
-      </p>
-
-      <label style={{ display: "block", marginBottom: "0.25rem" }}>
-        <div className="muted">Hostname</div>
-        <input
-          type="text"
-          value={hostname}
-          onChange={(e) => setHostname(e.target.value.toLowerCase())}
-          placeholder="my-agent"
-          style={{
-            width: "100%",
-            borderColor: hostnameError ? "var(--error, red)" : undefined,
-          }}
-          maxLength={30}
-        />
-      </label>
-      {hostnameError && (
-        <p style={{ color: "var(--error, red)", fontSize: "0.85rem", margin: "0.25rem 0 0.75rem" }}>
-          {hostnameError}
-        </p>
-      )}
-      {hostnameValid && (
-        <p
-          style={{
-            color: "var(--success, #3fb950)",
-            fontSize: "0.85rem",
-            margin: "0.25rem 0 0.75rem",
-          }}
-        >
-          ✓ Valid hostname
-        </p>
-      )}
-      {!hostname && (
-        <p style={{ margin: "0.25rem 0 0.75rem" }} />
-      )}
 
       <div style={{ marginTop: "1.25rem" }}>
         <button
@@ -167,11 +118,7 @@ export default function AgentConfig() {
         <button type="button" onClick={() => dispatch({ type: "PREV_STEP" })}>
           ← Back
         </button>
-        <button
-          type="button"
-          onClick={handleNext}
-          disabled={!hostnameValid}
-        >
+        <button type="button" onClick={handleNext}>
           Next →
         </button>
       </div>
