@@ -42,7 +42,7 @@ const STATUS_COLOR: Record<string, string> = {
   offline: "#6e7681",
 };
 
-const SERVER_TYPES = ["cx22", "cx32", "cx42", "cpx31", "cpx41", "cpx51", "ccx13", "ccx23"];
+const SERVER_TYPES = ["cx23", "cx33", "cx43", "cx53","cpx22", "cpx32", "cpx42", "cpx52", "cpx62", "ccx13", "ccx23", "ccx33"];
 const LOCATIONS = ["nbg1", "fsn1", "hel1", "ash", "hil", "sin"];
 
 export function NodesClient({

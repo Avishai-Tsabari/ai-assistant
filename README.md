@@ -12,6 +12,7 @@ The platform is split into three packages in this monorepo.
 |---------|------|-------|
 | `mercury-fork/` | Core agent runtime — chat adapters, Docker container runner, extensions, knowledge base | Bun, Hono, SQLite |
 | `mercury-cloud-console/` | Control plane — user auth, provisioning, billing, admin management | Next.js 15, React 19, Drizzle ORM, SQLite |
+| `mercury-node-agent/` | Compute node daemon — container lifecycle management (start/stop/restart/logs/images) on shared nodes | Bun, Hono |
 | `mercury-assistant/` | Reference Mercury project (config only — not deployed by this repo) | `mercury.yaml` + `.env` |
 
 Each package has its own `CLAUDE.md` with stack details and commands.
@@ -82,6 +83,11 @@ cd mercury-cloud-console
 bun install
 bun run dev        # http://localhost:3131
 bun run db:push    # apply schema changes
+
+# Node agent daemon
+cd mercury-node-agent
+bun install
+bun run dev        # watches src/, requires NODE_AGENT_TOKEN + NODE_AGENT_PORT in .env
 ```
 
 See each package's `CLAUDE.md` for full command reference.
