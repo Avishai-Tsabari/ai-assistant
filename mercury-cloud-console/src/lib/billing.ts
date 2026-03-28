@@ -3,12 +3,11 @@ import { getDb, subscriptions } from "@/lib/db";
 import { getStripe } from "@/lib/stripe";
 
 /** Look up a subscription row by stripeCustomerId. */
-export function getUserSubscription(userId: string) {
-  const rows = getDb()
+export async function getUserSubscription(userId: string) {
+  const rows = await getDb()
     .select()
     .from(subscriptions)
-    .where(eq(subscriptions.userId, userId))
-    .all();
+    .where(eq(subscriptions.userId, userId));
   return rows[0] ?? null;
 }
 
@@ -21,7 +20,7 @@ export async function getOrCreateStripeCustomer(
   userId: string,
   email: string,
 ): Promise<string> {
-  const existing = getUserSubscription(userId);
+  const existing = await getUserSubscription(userId);
   if (existing?.stripeCustomerId) {
     return existing.stripeCustomerId;
   }
@@ -38,21 +37,19 @@ export async function getOrCreateStripeCustomer(
 
   const now = new Date().toISOString();
   if (existing) {
-    getDb()
+    await getDb()
       .update(subscriptions)
       .set({ stripeCustomerId: customer.id, updatedAt: now })
-      .where(eq(subscriptions.userId, userId))
-      .run();
+      .where(eq(subscriptions.userId, userId));
   } else {
-    getDb()
+    await getDb()
       .insert(subscriptions)
       .values({
         userId,
         stripeCustomerId: customer.id,
         status: "inactive",
         updatedAt: now,
-      })
-      .run();
+      });
   }
 
   return customer.id;
@@ -68,21 +65,20 @@ type SubscriptionUpdate = Partial<{
 }>;
 
 /** Upsert a subscription row for the given userId. */
-export function upsertSubscription(
+export async function upsertSubscription(
   userId: string,
   data: SubscriptionUpdate,
-): void {
+): Promise<void> {
   const now = new Date().toISOString();
-  const existing = getUserSubscription(userId);
+  const existing = await getUserSubscription(userId);
 
   if (existing) {
-    getDb()
+    await getDb()
       .update(subscriptions)
       .set({ ...data, updatedAt: now })
-      .where(eq(subscriptions.userId, userId))
-      .run();
+      .where(eq(subscriptions.userId, userId));
   } else {
-    getDb()
+    await getDb()
       .insert(subscriptions)
       .values({
         userId,
@@ -93,7 +89,6 @@ export function upsertSubscription(
         currentPeriodEnd: data.currentPeriodEnd,
         canceledAt: data.canceledAt,
         updatedAt: now,
-      })
-      .run();
+      });
   }
 }

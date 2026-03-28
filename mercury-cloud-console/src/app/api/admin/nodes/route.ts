@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     new URL(request.url).searchParams.get("includeHealth") === "true";
 
   const db = getDb();
-  const nodes = db.select().from(computeNodes).all();
+  const nodes = await db.select().from(computeNodes);
 
   if (!includeHealth) {
     return NextResponse.json({ nodes });
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
   }
 
   const db = getDb();
-  const node = db
+  const node = await db
     .insert(computeNodes)
     .values({
       label,

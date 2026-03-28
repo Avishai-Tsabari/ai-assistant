@@ -14,15 +14,14 @@ function daysAgo(n: number): string {
   return new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
 }
 
-export function evaluateAlerts(): AlertEvent[] {
+export async function evaluateAlerts(): Promise<AlertEvent[]> {
   const db = getDb();
 
   // Load all enabled alerts
-  const alerts = db
+  const alerts = await db
     .select()
     .from(usageAlerts)
-    .where(eq(usageAlerts.enabled, 1))
-    .all();
+    .where(eq(usageAlerts.enabled, 1));
 
   const newEvents: AlertEvent[] = [];
 
@@ -30,21 +29,19 @@ export function evaluateAlerts(): AlertEvent[] {
     // Determine time window for aggregation
     const isDailyType =
       alert.thresholdType === "daily_tokens" || alert.thresholdType === "daily_cost";
-    const windowStart = isDailyType ? hoursAgo(24) : daysAgo(30);
     const periodStart = isDailyType ? hoursAgo(24) : daysAgo(30);
 
     // Get totals snapshots (spaceId IS NULL) for this agent in the window
-    const snapshots = db
+    const snapshots = await db
       .select()
       .from(usageSnapshots)
       .where(
         and(
           eq(usageSnapshots.agentId, alert.agentId),
           isNull(usageSnapshots.spaceId),
-          gte(usageSnapshots.snapshotAt, windowStart),
+          gte(usageSnapshots.snapshotAt, periodStart),
         ),
-      )
-      .all();
+      );
 
     if (snapshots.length === 0) continue;
 
@@ -60,7 +57,7 @@ export function evaluateAlerts(): AlertEvent[] {
     if (currentValue < alert.thresholdValue) continue;
 
     // Check: has an alert event already fired for this alert in the current period?
-    const existingEvent = db
+    const existingEvent = await db
       .select()
       .from(alertEvents)
       .where(
@@ -69,8 +66,7 @@ export function evaluateAlerts(): AlertEvent[] {
           gte(alertEvents.firedAt, periodStart),
         ),
       )
-      .limit(1)
-      .all();
+      .limit(1);
 
     if (existingEvent.length > 0) continue;
 
@@ -80,7 +76,7 @@ export function evaluateAlerts(): AlertEvent[] {
         ? (currentValue / alert.thresholdValue) * 100
         : null;
 
-    const inserted = db
+    const inserted = await db
       .insert(alertEvents)
       .values({
         agentId: alert.agentId,
@@ -93,8 +89,7 @@ export function evaluateAlerts(): AlertEvent[] {
         firedAt: new Date().toISOString(),
         notifiedAt: null,
       })
-      .returning()
-      .all();
+      .returning();
 
     newEvents.push(...inserted);
   }

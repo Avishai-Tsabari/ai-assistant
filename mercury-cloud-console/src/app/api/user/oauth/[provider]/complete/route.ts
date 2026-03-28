@@ -45,7 +45,7 @@ export async function POST(
   const db = getDb();
 
   // Look up the session (must belong to this user and not be expired)
-  const oauthSession = db
+  const oauthSession = await db
     .select()
     .from(oauthSessions)
     .where(and(eq(oauthSessions.id, sessionId), eq(oauthSessions.userId, userId)))
@@ -56,7 +56,7 @@ export async function POST(
   }
 
   if (new Date(oauthSession.expiresAt) < new Date()) {
-    db.delete(oauthSessions).where(eq(oauthSessions.id, sessionId)).run();
+    await db.delete(oauthSessions).where(eq(oauthSessions.id, sessionId));
     return NextResponse.json({ error: "OAuth session expired — please start again" }, { status: 400 });
   }
 
@@ -99,7 +99,7 @@ export async function POST(
   const keyId = crypto.randomUUID();
   const encryptedKey = encryptSecret(JSON.stringify(credentials), masterKey);
 
-  db.insert(providerKeys)
+  await db.insert(providerKeys)
     .values({
       id: keyId,
       userId,
@@ -108,11 +108,10 @@ export async function POST(
       label: "Connected via OAuth",
       encryptedKey,
       createdAt: new Date().toISOString(),
-    })
-    .run();
+    });
 
   // Clean up the session
-  db.delete(oauthSessions).where(eq(oauthSessions.id, sessionId)).run();
+  await db.delete(oauthSessions).where(eq(oauthSessions.id, sessionId));
 
   return NextResponse.json({ ok: true, keyId });
 }

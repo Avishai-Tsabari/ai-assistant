@@ -23,11 +23,10 @@ export async function sendAlertNotifications(events: AlertEvent[]): Promise<void
 
   // Look up agent -> userId/hostname mapping
   const agentIds = [...new Set(events.map((e) => e.agentId))];
-  const agentRows = db
+  const agentRows = await db
     .select({ id: agents.id, userId: agents.userId, hostname: agents.hostname })
     .from(agents)
-    .where(inArray(agents.id, agentIds))
-    .all();
+    .where(inArray(agents.id, agentIds));
 
   const agentMap = new Map(agentRows.map((a) => [a.id, a]));
 
@@ -49,12 +48,11 @@ export async function sendAlertNotifications(events: AlertEvent[]): Promise<void
 
   for (const [userId, groups] of eventsByUser) {
     // Load user notification preferences
-    const prefs = db
+    const prefs = await db
       .select()
       .from(alertNotifications)
       .where(eq(alertNotifications.userId, userId))
-      .limit(1)
-      .all();
+      .limit(1);
 
     const pref = prefs[0];
 
@@ -67,12 +65,11 @@ export async function sendAlertNotifications(events: AlertEvent[]): Promise<void
     // Determine recipient email: from pref or fall back to user table
     let toEmail = pref?.email;
     if (!toEmail) {
-      const userRow = db
+      const userRow = await db
         .select({ email: users.email })
         .from(users)
         .where(eq(users.id, userId))
-        .limit(1)
-        .all();
+        .limit(1);
       toEmail = userRow[0]?.email;
     }
     if (!toEmail) continue;
@@ -124,13 +121,10 @@ export async function sendAlertNotifications(events: AlertEvent[]): Promise<void
 
       // Mark events as notified
       const notifiedAt = new Date().toISOString();
-      const allEvents = groups.flatMap((g) => g.events);
-      for (const event of allEvents) {
-        db.update(alertEvents)
-          .set({ notifiedAt })
-          .where(eq(alertEvents.id, event.id))
-          .run();
-      }
+      const allEventIds = groups.flatMap((g) => g.events.map((e) => e.id));
+      await db.update(alertEvents)
+        .set({ notifiedAt })
+        .where(inArray(alertEvents.id, allEventIds));
     } catch (err) {
       console.error("[email-notifier] Failed to send email:", err);
     }

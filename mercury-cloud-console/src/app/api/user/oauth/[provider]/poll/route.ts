@@ -33,7 +33,7 @@ export async function GET(
 
   const db = getDb();
 
-  const oauthSession = db
+  const oauthSession = await db
     .select()
     .from(oauthSessions)
     .where(and(eq(oauthSessions.id, sessionId), eq(oauthSessions.userId, userId)))
@@ -44,7 +44,7 @@ export async function GET(
   }
 
   if (new Date(oauthSession.expiresAt) < new Date()) {
-    db.delete(oauthSessions).where(eq(oauthSessions.id, sessionId)).run();
+    await db.delete(oauthSessions).where(eq(oauthSessions.id, sessionId));
     return NextResponse.json({ error: "OAuth session expired — please start again" }, { status: 400 });
   }
 
@@ -81,7 +81,7 @@ export async function GET(
   const keyId = crypto.randomUUID();
   const encryptedKey = encryptSecret(JSON.stringify(pollResult.credentials), masterKey);
 
-  db.insert(providerKeys)
+  await db.insert(providerKeys)
     .values({
       id: keyId,
       userId,
@@ -90,10 +90,9 @@ export async function GET(
       label: "Connected via OAuth",
       encryptedKey,
       createdAt: new Date().toISOString(),
-    })
-    .run();
+    });
 
-  db.delete(oauthSessions).where(eq(oauthSessions.id, sessionId)).run();
+  await db.delete(oauthSessions).where(eq(oauthSessions.id, sessionId));
 
   return NextResponse.json({ status: "complete", keyId });
 }

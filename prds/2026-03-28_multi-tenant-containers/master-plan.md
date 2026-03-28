@@ -39,6 +39,26 @@ PRD-06 (Bootstrap) requires PRD-02 + PRD-04
 PRD-07 (Fork) — independent, run any time
 ```
 
+## Phase 2: Future Features (post Phase 1 stable)
+
+### User DB Encryption at Rest
+
+Each user's agent has a SQLite DB in a named Docker volume (`mercury-{agentId}-data`). Currently plaintext — anyone with server access can read it via the volume path.
+
+**Options considered:**
+
+| Option | Approach | Trade-off |
+|--------|----------|-----------|
+| SQLCipher | Full DB encryption with per-user key injected via env var | True zero-knowledge; Bun's SQLite doesn't support SQLCipher natively — requires native module swap; lost password = unrecoverable data |
+| Field-level encryption | Encrypt message content columns with per-user key before write | Easier with current stack; metadata (timestamps, space names) still visible |
+| Do nothing | Privacy policy covers it | Acceptable for MVP; most SaaS at this stage don't offer this |
+
+**Recommendation**: Field-level encryption (Option 2) as a Phase 2 feature. Full SQLCipher (Option 1) is a significant lift and creates a UX problem (no password recovery path).
+
+**Prerequisite**: User-facing key management UI — user sets a passphrase, key derived and injected as `MERCURY_DB_KEY` env var at container start, never stored by the platform.
+
+---
+
 ## Status Legend
 - 🔲 Todo
 - 🔄 In Progress

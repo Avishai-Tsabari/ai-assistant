@@ -21,26 +21,24 @@ export async function POST(req: Request) {
   }
 
   const db = getDb();
-  const existing = db
+  const existing = (await db
     .select()
     .from(users)
     .where(eq(users.email, email))
-    .limit(1)
-    .all()[0];
+    .limit(1))[0];
   if (existing) {
     return NextResponse.json({ error: "Email already registered" }, { status: 409 });
   }
 
   const id = crypto.randomUUID();
   const passwordHash = await bcrypt.hash(password, 12);
-  db.insert(users)
+  await db.insert(users)
     .values({
       id,
       email,
       passwordHash,
       createdAt: new Date().toISOString(),
-    })
-    .run();
+    });
 
   return NextResponse.json({ ok: true, id });
 }

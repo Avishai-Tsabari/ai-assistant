@@ -16,7 +16,7 @@ export async function POST(
   const { id } = await params;
   const db = getDb();
 
-  const agent = db.get<{ id: string; nodeId: string | null }>(
+  const agent = await db.get<{ id: string; nodeId: string | null }>(
     sql`SELECT id, node_id AS nodeId FROM agents WHERE id = ${id}`,
   );
   if (!agent) {
@@ -29,9 +29,8 @@ export async function POST(
     if (resolved.ok) {
       try {
         await resolved.ctx.nodeClient.removeContainer(id);
-        db.insert(containerEvents)
-          .values({ agentId: id, event: "stopped", details: JSON.stringify({ reason: "deprovisioned" }) })
-          .run();
+        await db.insert(containerEvents)
+          .values({ agentId: id, event: "stopped", details: JSON.stringify({ reason: "deprovisioned" }) });
       } catch {
         // Log but don't block deprovisioning if container removal fails
         // (node may be unreachable, container already removed, etc.)
@@ -40,7 +39,7 @@ export async function POST(
   }
 
   const deprovisionedAt = new Date().toISOString();
-  db.run(sql`UPDATE agents SET deprovisioned_at = ${deprovisionedAt}, container_status = 'stopped' WHERE id = ${id}`);
+  await db.run(sql`UPDATE agents SET deprovisioned_at = ${deprovisionedAt}, container_status = 'stopped' WHERE id = ${id}`);
 
   return NextResponse.json({ ok: true, deprovisionedAt });
 }

@@ -2,10 +2,10 @@ import { sql } from "drizzle-orm";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 
-export default function AdminOverviewPage() {
+export default async function AdminOverviewPage() {
   const db = getDb();
 
-  const stats = db.get<{
+  const stats = await db.get<{
     userCount: number;
     agentCount: number;
     activeSubCount: number;

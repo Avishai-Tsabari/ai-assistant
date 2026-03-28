@@ -7,7 +7,7 @@ export default async function OnboardingPage() {
   const session = await auth();
   const userId = session!.user!.id;
 
-  const result = getDb()
+  const result = await getDb()
     .select({ count: count() })
     .from(providerKeys)
     .where(eq(providerKeys.userId, userId))

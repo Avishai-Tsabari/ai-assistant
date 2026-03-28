@@ -64,7 +64,7 @@ type AgentRow = {
   healthUrl: string | null;
 };
 
-function queryAllAgents(opts?: { includeDeprovisioned?: boolean }): AgentRow[] {
+async function queryAllAgents(opts?: { includeDeprovisioned?: boolean }): Promise<AgentRow[]> {
   const db = getDb();
   const filter = opts?.includeDeprovisioned ? sql`` : sql`WHERE a.deprovisioned_at IS NULL`;
   return db.all<AgentRow>(sql`
@@ -84,7 +84,7 @@ function queryAllAgents(opts?: { includeDeprovisioned?: boolean }): AgentRow[] {
 }
 
 export async function pollAllAgentHealth(opts?: { includeDeprovisioned?: boolean }): Promise<AgentHealthResult[]> {
-  const agents = queryAllAgents(opts);
+  const agents = await queryAllAgents(opts);
   const results = await Promise.allSettled(agents.map(pollOne));
   return results.map((r, i) =>
     r.status === "fulfilled"
@@ -106,7 +106,7 @@ export async function pollAllAgentHealth(opts?: { includeDeprovisioned?: boolean
 
 export async function pollSingleAgentHealth(agentId: string): Promise<AgentHealthResult | null> {
   const db = getDb();
-  const agent = db.get<AgentRow>(sql`
+  const agent = await db.get<AgentRow>(sql`
     SELECT
       a.id,
       a.hostname,

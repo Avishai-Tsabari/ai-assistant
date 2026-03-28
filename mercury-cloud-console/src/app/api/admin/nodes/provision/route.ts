@@ -177,7 +177,7 @@ export async function POST(request: Request) {
         log("Node agent is healthy! Registering in console…");
 
         const db = getDb();
-        const node = db
+        const [node] = await db
           .insert(computeNodes)
           .values({
             label,
@@ -188,8 +188,7 @@ export async function POST(request: Request) {
             status: "active",
             createdAt: new Date().toISOString(),
           })
-          .returning()
-          .get();
+          .returning();
 
         log(`Node "${label}" registered successfully.`);
         enqueue({ done: true, node: { ...node, apiToken: "***" } });

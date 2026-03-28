@@ -18,13 +18,12 @@ export async function GET(request: NextRequest) {
   }
 
   const db = getDb();
-  const snapshots = db
+  const snapshots = await db
     .select()
     .from(usageSnapshots)
     .where(eq(usageSnapshots.agentId, agentId))
     .orderBy(desc(usageSnapshots.snapshotAt))
-    .limit(30)
-    .all();
+    .limit(30);
 
   return NextResponse.json({ snapshots });
 }
@@ -55,7 +54,7 @@ export async function POST(request: NextRequest) {
   const db = getDb();
   const now = new Date().toISOString();
 
-  const inserted = db
+  const inserted = await db
     .insert(usageAlerts)
     .values({
       agentId,
@@ -65,8 +64,7 @@ export async function POST(request: NextRequest) {
       createdAt: now,
       updatedAt: now,
     })
-    .returning()
-    .all();
+    .returning();
 
   return NextResponse.json({ alert: inserted[0] }, { status: 201 });
 }

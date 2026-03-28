@@ -62,7 +62,7 @@ export async function* provisionAgentContainer(
   yield { type: "progress", message: "Selecting compute node..." };
   let node;
   try {
-    node = selectNode();
+    node = await selectNode();
   } catch (err) {
     yield {
       type: "error",
@@ -130,14 +130,14 @@ export async function* provisionAgentContainer(
   const db = getDb();
   const keyIds: { provider: string; keyId: string; model: string }[] = [];
 
-  db.transaction((tx) => {
+  await db.transaction(async (tx) => {
     for (const leg of req.modelChain) {
       const keyId = crypto.randomUUID();
       const encryptedKey =
         masterKey && masterKey.length > 0
           ? encryptSecret(leg.apiKey, masterKey)
           : leg.apiKey;
-      tx.insert(providerKeysTable)
+      await tx.insert(providerKeysTable)
         .values({
           id: keyId,
           userId: req.userId,
@@ -145,12 +145,11 @@ export async function* provisionAgentContainer(
           label: null,
           encryptedKey,
           createdAt: new Date().toISOString(),
-        })
-        .run();
+        });
       keyIds.push({ provider: leg.provider, keyId, model: leg.model });
     }
 
-    tx.insert(agentsTable)
+    await tx.insert(agentsTable)
       .values({
         id: agentId,
         userId: req.userId,
@@ -164,20 +163,18 @@ export async function* provisionAgentContainer(
         apiSecretCipher,
         modelChainConfig: JSON.stringify(keyIds),
         createdAt: new Date().toISOString(),
-      })
-      .run();
+      });
 
-    tx.insert(containerEvents)
+    await tx.insert(containerEvents)
       .values({
         agentId,
         event: "started",
         details: JSON.stringify({ nodeId: node.id, image: agentImage }),
-      })
-      .run();
+      });
   });
 
   // ─── 5. Verify user exists (sanity check) ────────────────────────────
-  const user = db
+  const user = await db
     .select()
     .from(users)
     .where(eq(users.id, req.userId))

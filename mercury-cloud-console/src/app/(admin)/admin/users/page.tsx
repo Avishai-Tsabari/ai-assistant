@@ -1,10 +1,10 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 
-export default function AdminUsersPage() {
+export default async function AdminUsersPage() {
   const db = getDb();
 
-  const rows = db.all<{
+  const rows = await db.all<{
     id: string;
     email: string;
     role: string;

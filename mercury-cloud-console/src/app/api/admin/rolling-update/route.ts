@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
       try {
         // Load all active nodes
-        const nodes = db.select().from(computeNodes).all().filter((n) => n.status !== "offline");
+        const nodes = (await db.select().from(computeNodes)).filter((n) => n.status !== "offline");
 
         if (nodes.length === 0) {
           send("error", "No active compute nodes found");
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
           }
 
           // Step 2: Get all non-deprovisioned agents on this node
-          const nodeAgents = db.all<AgentRow>(
+          const nodeAgents = await db.all<AgentRow>(
             sql`SELECT id, node_id AS nodeId FROM agents WHERE node_id = ${node.id} AND deprovisioned_at IS NULL`,
           );
 
@@ -89,9 +89,8 @@ export async function POST(request: Request) {
 
               if (status.status === "running") {
                 send("progress", `[${node.label}] Agent ${agent.id.slice(0, 8)}... ✓ running`);
-                db.insert(containerEvents)
-                  .values({ agentId: agent.id, event: "updated", details: JSON.stringify({ imageTag }) })
-                  .run();
+                await db.insert(containerEvents)
+                  .values({ agentId: agent.id, event: "updated", details: JSON.stringify({ imageTag }) });
                 totalRestarted++;
               } else {
                 send("progress", `[${node.label}] Agent ${agent.id.slice(0, 8)}... ⚠ status: ${status.status}`);

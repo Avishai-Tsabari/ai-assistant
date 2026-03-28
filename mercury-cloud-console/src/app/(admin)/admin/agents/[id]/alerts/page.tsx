@@ -12,30 +12,27 @@ export default async function AgentAlertsPage({
   const { id } = await params;
   const db = getDb();
 
-  const agentRow = db
+  const agentRow = await db
     .select({ id: agents.id, hostname: agents.hostname })
     .from(agents)
     .where(eq(agents.id, id))
-    .limit(1)
-    .all();
+    .limit(1);
 
   if (!agentRow[0]) notFound();
 
   const agent = agentRow[0];
 
-  const configuredAlerts = db
+  const configuredAlerts = await db
     .select()
     .from(usageAlerts)
-    .where(eq(usageAlerts.agentId, id))
-    .all();
+    .where(eq(usageAlerts.agentId, id));
 
-  const recentEvents = db
+  const recentEvents = await db
     .select()
     .from(alertEvents)
     .where(eq(alertEvents.agentId, id))
     .orderBy(desc(alertEvents.firedAt))
-    .limit(20)
-    .all();
+    .limit(20);
 
   return (
     <>

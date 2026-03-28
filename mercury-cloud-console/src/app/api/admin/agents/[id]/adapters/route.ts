@@ -16,7 +16,7 @@ type AgentRow = {
   deprovisionedAt: string | null;
 };
 
-function lookupAgent(id: string): AgentRow | undefined {
+async function lookupAgent(id: string): Promise<AgentRow | undefined> {
   const db = getDb();
   return db.get<AgentRow>(sql`
     SELECT
@@ -44,7 +44,7 @@ export async function GET(
   if (denied) return denied;
 
   const { id } = await params;
-  const agent = lookupAgent(id);
+  const agent = await lookupAgent(id);
 
   if (!agent) {
     return NextResponse.json({ error: "Agent not found" }, { status: 404 });
@@ -97,7 +97,7 @@ export async function PUT(
   if (denied) return denied;
 
   const { id } = await params;
-  const agent = lookupAgent(id);
+  const agent = await lookupAgent(id);
 
   if (!agent) {
     return NextResponse.json({ error: "Agent not found" }, { status: 404 });

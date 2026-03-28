@@ -11,7 +11,7 @@ export async function GET() {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const rows = getDb()
+  const rows = await getDb()
     .select({
       id: agents.id,
       hostname: agents.hostname,
@@ -21,8 +21,7 @@ export async function GET() {
       createdAt: agents.createdAt,
     })
     .from(agents)
-    .where(eq(agents.userId, session.user.id))
-    .all();
+    .where(eq(agents.userId, session.user.id));
 
   return NextResponse.json({ agents: rows });
 }

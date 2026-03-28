@@ -17,11 +17,10 @@ export async function GET(
   const { agentId } = await params;
   const db = getDb();
 
-  const alerts = db
+  const alerts = await db
     .select()
     .from(usageAlerts)
-    .where(eq(usageAlerts.agentId, agentId))
-    .all();
+    .where(eq(usageAlerts.agentId, agentId));
 
   return NextResponse.json({ alerts });
 }
@@ -42,11 +41,10 @@ export async function DELETE(
   }
 
   const db = getDb();
-  const deleted = db
+  const deleted = await db
     .delete(usageAlerts)
     .where(and(eq(usageAlerts.id, alertId), eq(usageAlerts.agentId, agentId)))
-    .returning()
-    .all();
+    .returning();
 
   if (deleted.length === 0) {
     return NextResponse.json({ error: "Alert not found" }, { status: 404 });

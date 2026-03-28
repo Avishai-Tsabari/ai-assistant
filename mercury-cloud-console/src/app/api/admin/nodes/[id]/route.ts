@@ -23,7 +23,7 @@ export async function GET(
 
   const { id } = await params;
   const db = getDb();
-  const node = db
+  const node = await db
     .select()
     .from(computeNodes)
     .where(eq(computeNodes.id, id))
@@ -68,7 +68,7 @@ export async function PATCH(
   }
 
   const db = getDb();
-  const node = db
+  const node = await db
     .update(computeNodes)
     .set(parsed.data)
     .where(eq(computeNodes.id, id))
@@ -95,7 +95,7 @@ export async function DELETE(
   const db = getDb();
 
   // Check for active agents on this node before deleting
-  const activeCount = db.get<{ count: number }>(
+  const activeCount = await db.get<{ count: number }>(
     sql`SELECT COUNT(*) as count FROM agents WHERE node_id = ${id} AND deprovisioned_at IS NULL`,
   );
 
@@ -108,6 +108,6 @@ export async function DELETE(
     );
   }
 
-  db.delete(computeNodes).where(eq(computeNodes.id, id)).run();
+  await db.delete(computeNodes).where(eq(computeNodes.id, id));
   return NextResponse.json({ deleted: true });
 }

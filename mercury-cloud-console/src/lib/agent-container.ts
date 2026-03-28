@@ -29,7 +29,7 @@ export async function resolveAgentContainer(
 ): Promise<ResolveResult> {
   const db = getDb();
 
-  const row = db
+  const row = await db
     .select({
       id: agents.id,
       nodeId: agents.nodeId,
@@ -57,7 +57,7 @@ export async function resolveAgentContainer(
     };
   }
 
-  const node = db
+  const node = await db
     .select()
     .from(computeNodes)
     .where(eq(computeNodes.id, row.nodeId))
@@ -84,7 +84,7 @@ export async function resolveAgentContainerAdmin(
 ): Promise<ResolveResult> {
   const db = getDb();
 
-  const row = db
+  const row = await db
     .select({ id: agents.id, nodeId: agents.nodeId, deprovisionedAt: agents.deprovisionedAt })
     .from(agents)
     .where(eq(agents.id, agentId))
@@ -96,7 +96,7 @@ export async function resolveAgentContainerAdmin(
     return { ok: false, status: 400, error: "Agent is not in container mode" };
   }
 
-  const node = db
+  const node = await db
     .select()
     .from(computeNodes)
     .where(eq(computeNodes.id, row.nodeId))

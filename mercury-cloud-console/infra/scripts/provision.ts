@@ -234,7 +234,7 @@ async function main() {
 
   // ── Insert into control-plane SQLite DB so the dashboard can show this agent ──
   const db = getDb();
-  const user = db
+  const user = await db
     .select()
     .from(users)
     .where(eq(users.email, req.userEmail))
@@ -251,7 +251,7 @@ async function main() {
         ? encryptSecret(apiSecret, masterKey)
         : null;
 
-    db.insert(agentsTable)
+    await db.insert(agentsTable)
       .values({
         userId: user.id,
         hostname: req.hostname,
@@ -261,8 +261,7 @@ async function main() {
         healthUrl,
         apiSecretCipher,
         createdAt: new Date().toISOString(),
-      })
-      .run();
+      });
 
     console.log(`Agent linked to user ${req.userEmail} in console DB.`);
   }

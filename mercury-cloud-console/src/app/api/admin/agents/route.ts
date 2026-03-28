@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
   const db = getDb();
   const deprovFilter = includeDeprovisioned ? sql`` : sql`WHERE a.deprovisioned_at IS NULL`;
-  const rows = db.all(sql`
+  const rows = await db.all(sql`
     SELECT
       a.id,
       a.hostname,

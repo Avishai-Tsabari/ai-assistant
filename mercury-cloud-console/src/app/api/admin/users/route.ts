@@ -11,7 +11,7 @@ export async function GET() {
 
   const db = getDb();
 
-  const rows = db.all<{
+  const rows = await db.all<{
     id: string;
     email: string;
     role: string;

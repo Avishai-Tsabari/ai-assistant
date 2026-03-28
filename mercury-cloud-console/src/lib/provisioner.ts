@@ -189,14 +189,14 @@ export async function* provisionAgent(
 
   // Atomically persist provider keys + agent row
   const keyIds: { provider: string; keyId: string; model: string }[] = [];
-  db.transaction((tx) => {
+  await db.transaction(async (tx) => {
     for (const leg of req.modelChain) {
       const keyId = crypto.randomUUID();
       const encryptedKey =
         masterKey && masterKey.length > 0
           ? encryptSecret(leg.apiKey, masterKey)
           : leg.apiKey; // fallback: store plaintext if no master key (dev only)
-      tx.insert(providerKeysTable)
+      await tx.insert(providerKeysTable)
         .values({
           id: keyId,
           userId: req.userId,
@@ -204,12 +204,11 @@ export async function* provisionAgent(
           label: null,
           encryptedKey,
           createdAt: new Date().toISOString(),
-        })
-        .run();
+        });
       keyIds.push({ provider: leg.provider, keyId, model: leg.model });
     }
 
-    tx.insert(agentsTable)
+    await tx.insert(agentsTable)
       .values({
         id: agentId,
         userId: req.userId,
@@ -221,12 +220,11 @@ export async function* provisionAgent(
         apiSecretCipher,
         modelChainConfig: JSON.stringify(keyIds),
         createdAt: new Date().toISOString(),
-      })
-      .run();
+      });
   });
 
   // Verify user still exists (sanity check for FK)
-  const user = db.select().from(users).where(eq(users.id, req.userId)).get();
+  const user = await db.select().from(users).where(eq(users.id, req.userId)).get();
   if (!user) {
     yield { type: "error", message: `User ${req.userId} not found in DB` };
     return;

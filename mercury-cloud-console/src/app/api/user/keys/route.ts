@@ -15,7 +15,7 @@ export async function GET() {
   const userId = assertUserOrThrow(session);
   if (userId instanceof NextResponse) return userId;
 
-  const rows = getDb()
+  const rows = await getDb()
     .select({
       id: providerKeys.id,
       provider: providerKeys.provider,
@@ -24,8 +24,7 @@ export async function GET() {
       createdAt: providerKeys.createdAt,
     })
     .from(providerKeys)
-    .where(eq(providerKeys.userId, userId))
-    .all();
+    .where(eq(providerKeys.userId, userId));
 
   return NextResponse.json({ keys: rows });
 }
@@ -59,7 +58,7 @@ export async function POST(request: Request) {
   const encryptedKey = encryptSecret(trimmedKey, masterKey);
   const trimmedLabel = typeof label === "string" && label.trim() ? label.trim() : null;
 
-  getDb()
+  await getDb()
     .insert(providerKeys)
     .values({
       id,
@@ -68,8 +67,7 @@ export async function POST(request: Request) {
       label: trimmedLabel,
       encryptedKey,
       createdAt: new Date().toISOString(),
-    })
-    .run();
+    });
 
   return NextResponse.json({
     key: {

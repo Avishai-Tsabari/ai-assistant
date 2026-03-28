@@ -3,11 +3,11 @@ import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { agents, alertEvents } from "@/lib/db/schema";
 
-export default function UsageAlertsOverviewPage() {
+export default async function UsageAlertsOverviewPage() {
   const db = getDb();
 
   // Fetch recent alert events joined with agent hostname
-  const recentEventRows = db
+  const recentEventRows = await db
     .select({
       id: alertEvents.id,
       agentId: alertEvents.agentId,
@@ -22,8 +22,7 @@ export default function UsageAlertsOverviewPage() {
     .from(alertEvents)
     .innerJoin(agents, eq(alertEvents.agentId, agents.id))
     .orderBy(desc(alertEvents.firedAt))
-    .limit(50)
-    .all();
+    .limit(50);
 
   return (
     <>

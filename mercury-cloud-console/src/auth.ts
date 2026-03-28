@@ -27,12 +27,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const password = credentials?.password as string | undefined;
         if (!email || !password) return null;
         const db = getDb();
-        const row = db
+        const row = (await db
           .select()
           .from(users)
           .where(eq(users.email, email))
-          .limit(1)
-          .all()[0];
+          .limit(1))[0];
         if (!row || !row.passwordHash) return null;
         const ok = await bcrypt.compare(password, row.passwordHash);
         if (!ok) return null;
@@ -54,12 +53,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const email = user.email?.toLowerCase();
       if (!email) return false;
       const db = getDb();
-      const existing = db
+      const existing = (await db
         .select()
         .from(users)
         .where(eq(users.email, email))
-        .limit(1)
-        .all()[0];
+        .limit(1))[0];
       if (existing) {
         // Link to existing account — carry over id and role
         user.id = existing.id;
@@ -67,9 +65,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       } else {
         // Create new OAuth-only account (no password)
         const id = crypto.randomUUID();
-        db.insert(users)
-          .values({ id, email, passwordHash: null, createdAt: new Date().toISOString() })
-          .run();
+        await db.insert(users)
+          .values({ id, email, passwordHash: null, createdAt: new Date().toISOString() });
         user.id = id;
         (user as { role?: string }).role = "user";
       }

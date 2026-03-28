@@ -1,9 +1,9 @@
 import { getDb, computeNodes } from "@/lib/db";
 import { NodesClient } from "./NodesClient";
 
-export default function AdminNodesPage() {
+export default async function AdminNodesPage() {
   const db = getDb();
-  const nodes = db.select().from(computeNodes).all();
+  const nodes = await db.select().from(computeNodes);
 
   const envDefaults = {
     hetznerApiToken: process.env.HETZNER_API_TOKEN ?? "",

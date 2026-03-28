@@ -126,7 +126,13 @@
       "Read(//mnt/c/**)",
       "Read(//c/code/**)",
       "Bash(wslpath \"C:\\\\code\\\\agentic\\\\mercury\\\\mercury-cloud-console\")",
-      "Bash(wslpath:*)"
+      "Bash(wslpath:*)",
+      "Bash(tee /tmp/typecheck_errors.txt)",
+      "Bash(tsc --noEmit)",
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(find C:/code/agentic/mercury/mercury-cloud-console/src/app/api -name *.ts)",
+      "Bash(find /c/code/agentic/mercury/mercury-cloud-console/src/app/api -name *.ts)",
+      "Bash(grep -v \"^--$\")"
     ]
   }
 }

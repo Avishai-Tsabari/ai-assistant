@@ -39,14 +39,13 @@ export async function POST(
   const db = getDb();
 
   // Purge expired sessions for this user (housekeeping)
-  db.delete(oauthSessions)
+  await db.delete(oauthSessions)
     .where(
       and(
         eq(oauthSessions.userId, userId),
         lt(oauthSessions.expiresAt, new Date().toISOString()),
       ),
-    )
-    .run();
+    );
 
   const sessionId = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
@@ -59,7 +58,7 @@ export async function POST(
     const verifier = generatePkceVerifier();
     const authUrl = await buildAnthropicAuthUrl(verifier);
 
-    db.insert(oauthSessions)
+    await db.insert(oauthSessions)
       .values({
         id: sessionId,
         userId,
@@ -67,8 +66,7 @@ export async function POST(
         pkceVerifier: verifier,
         expiresAt,
         createdAt,
-      })
-      .run();
+      });
 
     return NextResponse.json({ sessionId, authUrl });
   }
@@ -76,7 +74,7 @@ export async function POST(
   // GitHub Copilot device code flow
   const flow = await startGithubDeviceFlow();
 
-  db.insert(oauthSessions)
+  await db.insert(oauthSessions)
     .values({
       id: sessionId,
       userId,
@@ -85,8 +83,7 @@ export async function POST(
       deviceInterval: flow.interval,
       expiresAt,
       createdAt,
-    })
-    .run();
+    });
 
   return NextResponse.json({
     sessionId,

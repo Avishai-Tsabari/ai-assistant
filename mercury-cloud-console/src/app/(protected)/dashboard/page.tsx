@@ -9,11 +9,10 @@ import AgentCard from "./AgentCard";
 export default async function DashboardPage() {
   const session = await auth();
   const userId = session!.user!.id;
-  const rows = getDb()
+  const rows = await getDb()
     .select()
     .from(agents)
-    .where(eq(agents.userId, userId))
-    .all();
+    .where(eq(agents.userId, userId));
 
   const activeAgents = rows.filter((a) => !a.deprovisionedAt);
 
@@ -44,11 +43,11 @@ export default async function DashboardPage() {
                 agent={{
                   id: a.id,
                   hostname: a.hostname,
-                  ipv4: a.ipv4 ?? null,
-                  dashboardUrl: a.dashboardUrl ?? null,
-                  nodeId: a.nodeId ?? null,
-                  containerStatus: (a.containerStatus as "running" | "stopped" | "restarting" | "failed" | null) ?? null,
-                  deprovisionedAt: a.deprovisionedAt ?? null,
+                  ipv4: a.ipv4,
+                  dashboardUrl: a.dashboardUrl,
+                  nodeId: a.nodeId,
+                  containerStatus: a.containerStatus as "running" | "stopped" | "restarting" | "failed" | null,
+                  deprovisionedAt: a.deprovisionedAt,
                 }}
               />
             ))}

@@ -48,7 +48,7 @@ export async function POST(request: Request) {
 
   // Verify user exists before starting long-running operation
   const db = getDb();
-  const user = db.select().from(users).where(eq(users.id, userId as string)).get();
+  const user = await db.select().from(users).where(eq(users.id, userId as string)).get();
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }

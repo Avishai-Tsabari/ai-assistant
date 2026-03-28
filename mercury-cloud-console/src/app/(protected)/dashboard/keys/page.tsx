@@ -8,7 +8,7 @@ export default async function KeysPage() {
   const session = await auth();
   const userId = session!.user!.id;
 
-  const rows = getDb()
+  const rows = await getDb()
     .select({
       id: providerKeys.id,
       provider: providerKeys.provider,
@@ -17,8 +17,7 @@ export default async function KeysPage() {
       createdAt: providerKeys.createdAt,
     })
     .from(providerKeys)
-    .where(eq(providerKeys.userId, userId))
-    .all();
+    .where(eq(providerKeys.userId, userId));
 
   return (
     <main>

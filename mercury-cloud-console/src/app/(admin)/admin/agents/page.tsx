@@ -12,9 +12,9 @@ type AgentRow = {
   dashboardUrl: string | null;
 };
 
-export default function AdminAgentsPage() {
+export default async function AdminAgentsPage() {
   const db = getDb();
-  const rows = db.all<AgentRow>(sql`
+  const rows = await db.all<AgentRow>(sql`
     SELECT
       a.id,
       a.hostname,

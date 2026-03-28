@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   const resolvedChain: { provider: string; apiKey: string; model: string; envVarOverride?: string }[] = [];
 
   for (const leg of modelChain) {
-    const keyRow = db
+    const keyRow = await db
       .select()
       .from(providerKeys)
       .where(and(eq(providerKeys.id, leg.keyId), eq(providerKeys.userId, userId)))
@@ -102,10 +102,9 @@ export async function POST(request: Request) {
           creds = await refreshOAuthCredentials(keyRow.provider, creds);
           // Persist refreshed credentials back to DB
           const refreshedEncrypted = encryptSecret(JSON.stringify(creds), masterKey);
-          db.update(providerKeys)
+          await db.update(providerKeys)
             .set({ encryptedKey: refreshedEncrypted })
-            .where(eq(providerKeys.id, leg.keyId))
-            .run();
+            .where(eq(providerKeys.id, leg.keyId));
         } catch (e) {
           return NextResponse.json(
             {

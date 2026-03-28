@@ -23,7 +23,7 @@ export async function GET(
   const { id } = await params;
 
   const db = getDb();
-  const agent = db
+  const agent = await db
     .select()
     .from(agents)
     .where(and(eq(agents.id, id), eq(agents.userId, userId)))
@@ -43,11 +43,10 @@ export async function GET(
 
   // Single query to fetch all key metadata
   const keyIds = chain.map((leg) => leg.keyId);
-  const keyRows = db
+  const keyRows = await db
     .select({ id: providerKeys.id, label: providerKeys.label })
     .from(providerKeys)
-    .where(and(inArray(providerKeys.id, keyIds), eq(providerKeys.userId, userId)))
-    .all();
+    .where(and(inArray(providerKeys.id, keyIds), eq(providerKeys.userId, userId)));
   const labelMap = new Map(keyRows.map((k) => [k.id, k.label]));
 
   const enriched = chain.map((leg) => ({
@@ -71,7 +70,7 @@ export async function PUT(
   const { id } = await params;
 
   const db = getDb();
-  const agent = db
+  const agent = await db
     .select()
     .from(agents)
     .where(and(eq(agents.id, id), eq(agents.userId, userId)))
@@ -113,11 +112,10 @@ export async function PUT(
 
   // Single batch query to validate all keyIds belong to this user
   const requestedKeyIds = incomingLegs.map((l) => l.keyId);
-  const fetchedKeys = db
+  const fetchedKeys = await db
     .select()
     .from(providerKeys)
-    .where(and(inArray(providerKeys.id, requestedKeyIds), eq(providerKeys.userId, userId)))
-    .all();
+    .where(and(inArray(providerKeys.id, requestedKeyIds), eq(providerKeys.userId, userId)));
   const keyMap = new Map(fetchedKeys.map((k) => [k.id, k]));
 
   const resolvedChain: ChainEntry[] = [];
@@ -130,10 +128,9 @@ export async function PUT(
   }
 
   // Persist updated model chain
-  db.update(agents)
+  await db.update(agents)
     .set({ modelChainConfig: JSON.stringify(resolvedChain) })
-    .where(and(eq(agents.id, id), eq(agents.userId, userId)))
-    .run();
+    .where(and(eq(agents.id, id), eq(agents.userId, userId)));
 
   // Best-effort: push updated env vars to live agent
   if (agent.healthUrl && agent.apiSecretCipher) {

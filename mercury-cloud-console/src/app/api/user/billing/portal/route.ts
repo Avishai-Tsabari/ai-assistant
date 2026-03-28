@@ -18,7 +18,7 @@ export async function POST() {
   const userId = assertUserOrThrow(session);
   if (userId instanceof NextResponse) return userId;
 
-  const subscription = getUserSubscription(userId);
+  const subscription = await getUserSubscription(userId);
   if (!subscription?.stripeCustomerId) {
     return NextResponse.json({ error: "No billing account found" }, { status: 400 });
   }

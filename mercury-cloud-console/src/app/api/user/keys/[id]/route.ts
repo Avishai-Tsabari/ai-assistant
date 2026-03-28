@@ -19,7 +19,7 @@ export async function PUT(
   const { id } = await params;
 
   const db = getDb();
-  const existing = db
+  const existing = await db
     .select()
     .from(providerKeys)
     .where(and(eq(providerKeys.id, id), eq(providerKeys.userId, userId)))
@@ -50,10 +50,9 @@ export async function PUT(
   }
 
   if (Object.keys(updates).length > 0) {
-    db.update(providerKeys)
+    await db.update(providerKeys)
       .set(updates)
-      .where(and(eq(providerKeys.id, id), eq(providerKeys.userId, userId)))
-      .run();
+      .where(and(eq(providerKeys.id, id), eq(providerKeys.userId, userId)));
   }
 
   return NextResponse.json({ ok: true });
@@ -70,12 +69,12 @@ export async function DELETE(
   const { id } = await params;
 
   const db = getDb();
-  const deleted = db
+  const deleted = await db
     .delete(providerKeys)
     .where(and(eq(providerKeys.id, id), eq(providerKeys.userId, userId)))
-    .run();
+    .returning();
 
-  if (deleted.changes === 0) {
+  if (deleted.length === 0) {
     return NextResponse.json({ error: "Key not found" }, { status: 404 });
   }
 

@@ -1,202 +1,184 @@
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./schema";
 
-function dbPath(): string {
+function createInstance() {
   const url = process.env.DATABASE_URL ?? "file:./data/console.db";
-  return url.replace(/^file:/, "");
+  const authToken = process.env.DATABASE_AUTH_TOKEN || undefined;
+  const client = createClient({ url, authToken });
+  return { client, db: drizzle(client, { schema }) };
 }
 
-function bootstrap(sqlite: Database.Database) {
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY NOT NULL,
-      email TEXT NOT NULL UNIQUE,
-      password_hash TEXT,
-      role TEXT NOT NULL DEFAULT 'user',
-      created_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS agents (
-      id TEXT PRIMARY KEY NOT NULL,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      hostname TEXT NOT NULL,
-      server_id INTEGER,
-      ipv4 TEXT,
-      dashboard_url TEXT,
-      health_url TEXT,
-      api_secret_cipher TEXT,
-      deprovisioned_at TEXT,
-      created_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS subscriptions (
-      id TEXT PRIMARY KEY NOT NULL,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      stripe_customer_id TEXT,
-      status TEXT NOT NULL DEFAULT 'inactive',
-      updated_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS provider_keys (
-      id TEXT PRIMARY KEY NOT NULL,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      provider TEXT NOT NULL,
-      label TEXT,
-      encrypted_key TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-  `);
+let instance: ReturnType<typeof createInstance> | undefined;
+let initialized = false;
 
-  // Migration: add role column to existing users table
-  try {
-    sqlite.exec(`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'`);
-  } catch {
-    // Column already exists — ignore
+function getInstance() {
+  if (!instance) {
+    instance = createInstance();
   }
+  return instance;
+}
 
-  // Migration: add deprovisioned_at column to existing agents table
-  try {
-    sqlite.exec(`ALTER TABLE agents ADD COLUMN deprovisioned_at TEXT`);
-  } catch {
-    // Column already exists — ignore
-  }
+export async function initDb() {
+  if (initialized) return;
+  initialized = true;
 
-  // Migration: add model_chain_config column to agents
-  try {
-    sqlite.exec(`ALTER TABLE agents ADD COLUMN model_chain_config TEXT`);
-  } catch {
-    // Column already exists — ignore
-  }
+  const { client } = getInstance();
 
-  // Migration: make password_hash nullable (for OAuth accounts)
-  try {
-    const info = sqlite.prepare("PRAGMA table_info(users)").all() as Array<{ name: string; notnull: number }>;
-    const col = info.find((c) => c.name === "password_hash");
-    if (col && col.notnull === 1) {
-      sqlite.exec(`
-        ALTER TABLE users RENAME TO users_old;
-        CREATE TABLE users (
+  // Create all tables (idempotent)
+  await client.batch(
+    [
+      {
+        sql: `CREATE TABLE IF NOT EXISTS users (
           id TEXT PRIMARY KEY NOT NULL,
           email TEXT NOT NULL UNIQUE,
           password_hash TEXT,
           role TEXT NOT NULL DEFAULT 'user',
           created_at TEXT NOT NULL
-        );
-        INSERT INTO users SELECT id, email, password_hash, role, created_at FROM users_old;
-        DROP TABLE users_old;
-      `);
-    }
-  } catch {
-    // Already nullable or migration failed — ignore
-  }
+        )`,
+      },
+      {
+        sql: `CREATE TABLE IF NOT EXISTS compute_nodes (
+          id TEXT PRIMARY KEY NOT NULL,
+          label TEXT NOT NULL,
+          host TEXT NOT NULL,
+          api_url TEXT NOT NULL,
+          api_token TEXT NOT NULL,
+          max_agents INTEGER NOT NULL DEFAULT 100,
+          status TEXT NOT NULL DEFAULT 'active',
+          created_at TEXT NOT NULL
+        )`,
+      },
+      {
+        sql: `CREATE TABLE IF NOT EXISTS agents (
+          id TEXT PRIMARY KEY NOT NULL,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          hostname TEXT NOT NULL,
+          server_id INTEGER,
+          ipv4 TEXT,
+          node_id TEXT REFERENCES compute_nodes(id),
+          container_id TEXT,
+          container_port INTEGER,
+          container_status TEXT,
+          image_tag TEXT,
+          dashboard_url TEXT,
+          health_url TEXT,
+          api_secret_cipher TEXT,
+          model_chain_config TEXT,
+          deprovisioned_at TEXT,
+          created_at TEXT NOT NULL
+        )`,
+      },
+      {
+        sql: `CREATE TABLE IF NOT EXISTS subscriptions (
+          id TEXT PRIMARY KEY NOT NULL,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          stripe_customer_id TEXT,
+          stripe_subscription_id TEXT,
+          price_id TEXT,
+          current_period_end TEXT,
+          canceled_at TEXT,
+          status TEXT NOT NULL DEFAULT 'inactive',
+          updated_at TEXT NOT NULL
+        )`,
+      },
+      {
+        sql: `CREATE TABLE IF NOT EXISTS provider_keys (
+          id TEXT PRIMARY KEY NOT NULL,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          provider TEXT NOT NULL,
+          label TEXT,
+          key_type TEXT NOT NULL DEFAULT 'api_key',
+          encrypted_key TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        )`,
+      },
+      {
+        sql: `CREATE TABLE IF NOT EXISTS oauth_sessions (
+          id TEXT PRIMARY KEY NOT NULL,
+          user_id TEXT NOT NULL,
+          provider TEXT NOT NULL,
+          pkce_verifier TEXT,
+          device_code TEXT,
+          device_interval INTEGER,
+          expires_at TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        )`,
+      },
+      {
+        sql: `CREATE TABLE IF NOT EXISTS usage_alerts (
+          id TEXT PRIMARY KEY NOT NULL,
+          agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+          threshold_type TEXT NOT NULL,
+          threshold_value REAL NOT NULL,
+          enabled INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )`,
+      },
+      {
+        sql: `CREATE TABLE IF NOT EXISTS usage_snapshots (
+          id TEXT PRIMARY KEY NOT NULL,
+          agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+          space_id TEXT,
+          total_input_tokens INTEGER NOT NULL,
+          total_output_tokens INTEGER NOT NULL,
+          total_tokens INTEGER NOT NULL,
+          total_cost REAL NOT NULL,
+          run_count INTEGER NOT NULL,
+          last_used_at INTEGER,
+          snapshot_at TEXT NOT NULL
+        )`,
+      },
+      {
+        sql: `CREATE TABLE IF NOT EXISTS alert_events (
+          id TEXT PRIMARY KEY NOT NULL,
+          agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+          alert_id TEXT NOT NULL REFERENCES usage_alerts(id) ON DELETE CASCADE,
+          snapshot_id TEXT NOT NULL REFERENCES usage_snapshots(id) ON DELETE CASCADE,
+          threshold_type TEXT NOT NULL,
+          current_value REAL NOT NULL,
+          threshold_value REAL NOT NULL,
+          breach_pct REAL,
+          fired_at TEXT NOT NULL,
+          notified_at TEXT
+        )`,
+      },
+      {
+        sql: `CREATE TABLE IF NOT EXISTS alert_notifications (
+          id TEXT PRIMARY KEY NOT NULL,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          email TEXT NOT NULL,
+          alert_enabled INTEGER NOT NULL DEFAULT 1,
+          digest_frequency TEXT NOT NULL DEFAULT 'immediate',
+          created_at TEXT NOT NULL
+        )`,
+      },
+      {
+        sql: `CREATE TABLE IF NOT EXISTS container_events (
+          id TEXT PRIMARY KEY NOT NULL,
+          agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+          event TEXT NOT NULL,
+          details TEXT,
+          created_at TEXT NOT NULL
+        )`,
+      },
+    ],
+    "write",
+  );
 
-  // Migration: add new billing columns to subscriptions table
-  for (const col of [
-    "ALTER TABLE subscriptions ADD COLUMN stripe_subscription_id TEXT",
-    "ALTER TABLE subscriptions ADD COLUMN price_id TEXT",
-    "ALTER TABLE subscriptions ADD COLUMN current_period_end TEXT",
-    "ALTER TABLE subscriptions ADD COLUMN canceled_at TEXT",
-  ]) {
-    try {
-      sqlite.exec(col);
-    } catch {
-      // Column already exists — ignore
-    }
-  }
-
-  // Migration: add key_type column to provider_keys
-  try {
-    sqlite.exec(`ALTER TABLE provider_keys ADD COLUMN key_type TEXT NOT NULL DEFAULT 'api_key'`);
-  } catch {
-    // Column already exists — ignore
-  }
-
-  // Migration: create oauth_sessions table
-  try {
-    sqlite.exec(`
-      CREATE TABLE IF NOT EXISTS oauth_sessions (
-        id TEXT PRIMARY KEY NOT NULL,
-        user_id TEXT NOT NULL,
-        provider TEXT NOT NULL,
-        pkce_verifier TEXT,
-        device_code TEXT,
-        device_interval INTEGER,
-        expires_at TEXT NOT NULL,
-        created_at TEXT NOT NULL
-      )
-    `);
-  } catch {
-    // Table already exists — ignore
-  }
-
-  // Migration: create compute_nodes table
-  try {
-    sqlite.exec(`
-      CREATE TABLE IF NOT EXISTS compute_nodes (
-        id TEXT PRIMARY KEY NOT NULL,
-        label TEXT NOT NULL,
-        host TEXT NOT NULL,
-        api_url TEXT NOT NULL,
-        api_token TEXT NOT NULL,
-        max_agents INTEGER NOT NULL DEFAULT 100,
-        status TEXT NOT NULL DEFAULT 'active',
-        created_at TEXT NOT NULL
-      )
-    `);
-  } catch {
-    // Table already exists — ignore
-  }
-
-  // Migration: add container-mode columns to agents table
-  for (const col of [
-    "ALTER TABLE agents ADD COLUMN node_id TEXT REFERENCES compute_nodes(id)",
-    "ALTER TABLE agents ADD COLUMN container_id TEXT",
-    "ALTER TABLE agents ADD COLUMN container_port INTEGER",
-    "ALTER TABLE agents ADD COLUMN container_status TEXT",
-    "ALTER TABLE agents ADD COLUMN image_tag TEXT",
-  ]) {
-    try {
-      sqlite.exec(col);
-    } catch {
-      // Column already exists — ignore
-    }
-  }
-
-  // Migration: create container_events audit log
-  try {
-    sqlite.exec(`
-      CREATE TABLE IF NOT EXISTS container_events (
-        id TEXT PRIMARY KEY NOT NULL,
-        agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-        event TEXT NOT NULL,
-        details TEXT,
-        created_at TEXT NOT NULL
-      )
-    `);
-  } catch {
-    // Table already exists — ignore
-  }
-
-  // Promote ADMIN_EMAIL to admin role (idempotent, runs once per process on DB init)
+  // Promote ADMIN_EMAIL to admin role (idempotent)
   const adminEmail = process.env.ADMIN_EMAIL?.trim();
   if (adminEmail) {
-    sqlite
-      .prepare(`UPDATE users SET role = 'admin' WHERE email = ? AND role != 'admin'`)
-      .run(adminEmail);
+    await client.execute({
+      sql: `UPDATE users SET role = 'admin' WHERE email = ? AND role != 'admin'`,
+      args: [adminEmail],
+    });
   }
 }
 
-let drizzleInstance: ReturnType<typeof drizzle<typeof schema>> | undefined;
-
 export function getDb() {
-  if (!drizzleInstance) {
-    const path = dbPath();
-    mkdirSync(dirname(path), { recursive: true });
-    const raw = new Database(path);
-    bootstrap(raw);
-    drizzleInstance = drizzle(raw, { schema });
-  }
-  return drizzleInstance;
+  return getInstance().db;
 }
 
 export * from "./schema";

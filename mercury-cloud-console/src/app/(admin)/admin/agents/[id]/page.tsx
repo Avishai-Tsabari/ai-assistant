@@ -24,7 +24,7 @@ export default async function AgentDetailPage({
   const { id } = await params;
   const db = getDb();
 
-  const agent = db.get<AgentDetail>(sql`
+  const agent = await db.get<AgentDetail>(sql`
     SELECT
       a.id,
       a.hostname,

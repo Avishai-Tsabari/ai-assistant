@@ -3,7 +3,7 @@
  * Uses least-loaded strategy: picks the active node with the fewest running agents.
  */
 
-import { eq } from "drizzle-orm";
+import { and, count, eq, isNotNull, isNull } from "drizzle-orm";
 import { getDb, computeNodes, agents } from "@/lib/db";
 
 export interface ScheduledNode {
@@ -19,15 +19,14 @@ export interface ScheduledNode {
  * Strategy: least-loaded (fewest non-deprovisioned agents).
  * Falls back to the first active node if agent counts can't be determined.
  */
-export function selectNode(): ScheduledNode {
+export async function selectNode(): Promise<ScheduledNode> {
   const db = getDb();
 
   // Get all active nodes
-  const activeNodes = db
+  const activeNodes = await db
     .select()
     .from(computeNodes)
-    .where(eq(computeNodes.status, "active"))
-    .all();
+    .where(eq(computeNodes.status, "active"));
 
   if (activeNodes.length === 0) {
     throw new Error(
@@ -35,17 +34,16 @@ export function selectNode(): ScheduledNode {
     );
   }
 
-  // Count running agents per node
-  const allAgents = db
-    .select({ nodeId: agents.nodeId })
+  // Count active agents per node (SQL aggregate — avoids full table scan)
+  const agentCounts = await db
+    .select({ nodeId: agents.nodeId, count: count() })
     .from(agents)
-    .all()
-    .filter((a) => a.nodeId !== null);
+    .where(and(isNotNull(agents.nodeId), isNull(agents.deprovisionedAt)))
+    .groupBy(agents.nodeId);
 
-  const countByNode = new Map<string, number>();
-  for (const a of allAgents) {
-    countByNode.set(a.nodeId!, (countByNode.get(a.nodeId!) ?? 0) + 1);
-  }
+  const countByNode = new Map<string, number>(
+    agentCounts.map((r) => [r.nodeId!, r.count]),
+  );
 
   // Pick the node with the fewest agents (and under maxAgents limit)
   let bestNode = activeNodes[0];

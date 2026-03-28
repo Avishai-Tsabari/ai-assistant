@@ -12,11 +12,10 @@ async function resolveUserId(
   customerId: string,
 ): Promise<string | null> {
   // First check if we have this customer in our subscriptions table
-  const rows = getDb()
+  const rows = await getDb()
     .select()
     .from(subscriptions)
-    .where(eq(subscriptions.stripeCustomerId, customerId))
-    .all();
+    .where(eq(subscriptions.stripeCustomerId, customerId));
 
   if (rows[0]?.userId) {
     return rows[0].userId;
@@ -69,7 +68,7 @@ export async function POST(req: Request) {
         typeof sub.customer === "string" ? sub.customer : sub.customer.id;
       const userId = await resolveUserId(stripe, customerId);
       if (userId) {
-        upsertSubscription(userId, {
+        await upsertSubscription(userId, {
           stripeCustomerId: customerId,
           stripeSubscriptionId: sub.id,
           status: sub.status,
@@ -86,7 +85,7 @@ export async function POST(req: Request) {
         typeof sub.customer === "string" ? sub.customer : sub.customer.id;
       const userId = await resolveUserId(stripe, customerId);
       if (userId) {
-        upsertSubscription(userId, {
+        await upsertSubscription(userId, {
           stripeCustomerId: customerId,
           stripeSubscriptionId: sub.id,
           status: "canceled",
@@ -104,7 +103,7 @@ export async function POST(req: Request) {
         typeof rawCustomer === "string" ? rawCustomer : rawCustomer.id;
       const userId = await resolveUserId(stripe, customerId);
       if (userId) {
-        upsertSubscription(userId, {
+        await upsertSubscription(userId, {
           stripeCustomerId: customerId,
           status: "past_due",
         });
@@ -120,7 +119,7 @@ export async function POST(req: Request) {
         typeof rawCustomer === "string" ? rawCustomer : rawCustomer.id;
       const userId = await resolveUserId(stripe, customerId);
       if (userId) {
-        upsertSubscription(userId, {
+        await upsertSubscription(userId, {
           stripeCustomerId: customerId,
           status: "active",
         });

@@ -13,7 +13,7 @@ export default async function BillingPage({
   const successParam = params["success"] === "1";
 
   const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
-  const subscription = getUserSubscription(userId);
+  const subscription = await getUserSubscription(userId);
 
   return (
     <BillingClient

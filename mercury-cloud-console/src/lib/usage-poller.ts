@@ -10,7 +10,7 @@ type AgentRow = {
   apiSecretCipher: string | null;
 };
 
-function queryAllAgents(): AgentRow[] {
+async function queryAllAgents(): Promise<AgentRow[]> {
   const db = getDb();
   return db.all<AgentRow>(sql`
     SELECT
@@ -43,7 +43,7 @@ export async function pollOneAgentUsage(agent: {
 export async function pollAllAgentUsage(): Promise<
   Array<{ agentId: string; userId: string; usage: UsageResponse | null }>
 > {
-  const agents = queryAllAgents();
+  const agents = await queryAllAgents();
   const results = await Promise.allSettled(agents.map(pollOneAgentUsage));
 
   const output: Array<{ agentId: string; userId: string; usage: UsageResponse | null }> = [];
@@ -60,7 +60,7 @@ export async function pollAllAgentUsage(): Promise<
     if (!usage) continue;
 
     // Store totals as a null-spaceId snapshot
-    db.insert(usageSnapshots)
+    await db.insert(usageSnapshots)
       .values({
         agentId: agent.id,
         spaceId: null,
@@ -71,12 +71,11 @@ export async function pollAllAgentUsage(): Promise<
         runCount: usage.totals.runCount,
         lastUsedAt: null,
         snapshotAt: now,
-      })
-      .run();
+      });
 
     // Store per-space snapshots
     for (const space of usage.perSpace) {
-      db.insert(usageSnapshots)
+      await db.insert(usageSnapshots)
         .values({
           agentId: agent.id,
           spaceId: space.spaceId,
@@ -87,8 +86,7 @@ export async function pollAllAgentUsage(): Promise<
           runCount: space.runCount,
           lastUsedAt: space.lastUsedAt ?? null,
           snapshotAt: now,
-        })
-        .run();
+        });
     }
   }
 

@@ -7,7 +7,7 @@ async function run() {
   console.log("[usage-alerts] Polling agent usage...");
   await pollAllAgentUsage();
   console.log("[usage-alerts] Evaluating alert thresholds...");
-  const events = evaluateAlerts();
+  const events = await evaluateAlerts();
   console.log(`[usage-alerts] ${events.length} new alert(s)`);
   await sendAlertNotifications(events);
   console.log("[usage-alerts] Done.");
