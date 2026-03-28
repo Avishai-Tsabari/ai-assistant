@@ -59,10 +59,12 @@ export default function Success() {
           <span className="muted">Agent ID</span>
           <code style={{ fontSize: "0.85rem" }}>{agentId}</code>
         </div>
-        <div style={rowStyle}>
-          <span className="muted">IP Address</span>
-          <code style={{ fontSize: "0.85rem" }}>{ipv4}</code>
-        </div>
+        {ipv4 && (
+          <div style={rowStyle}>
+            <span className="muted">IP Address</span>
+            <code style={{ fontSize: "0.85rem" }}>{ipv4}</code>
+          </div>
+        )}
         <div style={rowStyle}>
           <span className="muted">Dashboard URL</span>
           {dashboardUrl ? (

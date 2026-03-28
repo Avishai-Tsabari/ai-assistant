@@ -132,7 +132,8 @@
       "Bash(echo \"Exit code: $?\")",
       "Bash(find C:/code/agentic/mercury/mercury-cloud-console/src/app/api -name *.ts)",
       "Bash(find /c/code/agentic/mercury/mercury-cloud-console/src/app/api -name *.ts)",
-      "Bash(grep -v \"^--$\")"
+      "Bash(grep -v \"^--$\")",
+      "Bash(find /c/code/agentic/mercury -type d -name *node-agent* -o -name *node*agent*)"
     ]
   }
 }
