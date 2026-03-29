@@ -217,6 +217,12 @@ export class MercuryCoreRuntime {
         message.callerId,
         message.attachments,
         message.authorName,
+        {
+          platform: message.platform,
+          conversationExternalId: message.conversationExternalId,
+          replyToPlatformMessageId: message.replyToPlatformMessageId,
+          platformMessageId: message.platformMessageId,
+        },
       );
       return { ...route, result };
     } catch (error) {
@@ -407,6 +413,12 @@ export class MercuryCoreRuntime {
     callerId: string,
     attachments?: MessageAttachment[],
     authorName?: string,
+    replyMeta?: {
+      platform?: string;
+      conversationExternalId?: string;
+      replyToPlatformMessageId?: string;
+      platformMessageId?: string;
+    },
   ): Promise<ContainerResult> {
     this.db.ensureSpace(spaceId);
 
@@ -464,18 +476,80 @@ export class MercuryCoreRuntime {
         }
       }
 
-      // Fetch prior completed turns BEFORE storing the current message,
-      // so the current prompt doesn't appear twice (once in history, once as prompt).
-      const history = this.db.getRecentTurns(spaceId, 10);
-      // One-shot clear: reset temporary boundary immediately after reading history.
-      this.db.resetClearBoundary(spaceId);
+      // Fetch prior turns based on context mode.
+      // In clear mode, only include reply chain context (if replying to a bot message).
+      // In context mode, use the existing sliding window.
+      const contextMode =
+        this.db.getSpaceConfig(spaceId, "context.mode") ?? "clear";
+
+      let history: import("../types.js").StoredMessage[];
+      if (contextMode === "context") {
+        history = this.db.getRecentTurns(spaceId, 10);
+        // One-shot clear: reset temporary boundary immediately after reading history.
+        this.db.resetClearBoundary(spaceId);
+      } else {
+        // Clear mode: only include reply chain if this message is a reply
+        if (
+          replyMeta?.replyToPlatformMessageId &&
+          replyMeta.platform &&
+          replyMeta.conversationExternalId
+        ) {
+          const mercuryMsgId = this.db.lookupMercuryMessageId(
+            replyMeta.platform,
+            replyMeta.conversationExternalId,
+            replyMeta.replyToPlatformMessageId,
+          );
+          if (mercuryMsgId !== null) {
+            const depthStr = this.db.getSpaceConfig(
+              spaceId,
+              "context.reply_chain_depth",
+            );
+            const depth = depthStr ? Number.parseInt(depthStr, 10) : 10;
+            history = this.db.getReplyChain(mercuryMsgId, depth);
+          } else {
+            history = []; // Message predates feature — no chain available
+          }
+        } else {
+          history = []; // New independent message — no prior context
+        }
+      }
+
+      // Resolve the Mercury message ID being replied to (if any)
+      let userReplyToId: number | undefined;
+      if (
+        replyMeta?.replyToPlatformMessageId &&
+        replyMeta.platform &&
+        replyMeta.conversationExternalId
+      ) {
+        const resolved = this.db.lookupMercuryMessageId(
+          replyMeta.platform,
+          replyMeta.conversationExternalId,
+          replyMeta.replyToPlatformMessageId,
+        );
+        if (resolved !== null) userReplyToId = resolved;
+      }
 
       const userMessageId = this.db.addMessage(
         spaceId,
         "user",
         finalPrompt,
         attachments,
+        userReplyToId,
       );
+
+      // Record platform message ID mapping for the inbound user message
+      if (
+        replyMeta?.platformMessageId &&
+        replyMeta.platform &&
+        replyMeta.conversationExternalId
+      ) {
+        this.db.addPlatformMessageId(
+          userMessageId,
+          replyMeta.platform,
+          replyMeta.conversationExternalId,
+          replyMeta.platformMessageId,
+        );
+      }
 
       // Compute caller role, denied CLIs, and permitted env vars
       let callerRole = "member";
@@ -584,7 +658,13 @@ export class MercuryCoreRuntime {
         }
       }
 
-      this.db.addMessage(spaceId, "assistant", containerResult.reply);
+      const assistantMessageId = this.db.addMessage(
+        spaceId,
+        "assistant",
+        containerResult.reply,
+        undefined,
+        userMessageId, // reply chain: assistant replies to user message
+      );
 
       if (containerResult.usage) {
         this.db.recordUsage(spaceId, containerResult.usage);
@@ -600,7 +680,26 @@ export class MercuryCoreRuntime {
         userTurnRunMeta(containerResult.usage),
       );
 
+      containerResult.assistantMessageId = assistantMessageId;
       return containerResult;
     });
+  }
+
+  /**
+   * Record the platform message ID for an outbound assistant message.
+   * Called by the handler after sendReply() returns the platform ID.
+   */
+  recordOutboundPlatformId(
+    assistantMessageId: number,
+    platform: string,
+    conversationExternalId: string,
+    platformMessageId: string,
+  ): void {
+    this.db.addPlatformMessageId(
+      assistantMessageId,
+      platform,
+      conversationExternalId,
+      platformMessageId,
+    );
   }
 }

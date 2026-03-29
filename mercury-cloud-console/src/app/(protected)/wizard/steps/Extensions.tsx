@@ -104,7 +104,7 @@ export default function Extensions() {
                 type="checkbox"
                 checked={selected.has(ext.id)}
                 onChange={() => toggleExtension(ext.id)}
-                style={{ marginTop: "2px", flexShrink: 0 }}
+                style={{ marginTop: "2px", flexShrink: 0, width: "auto" }}
               />
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600 }}>{ext.display_name}</div>

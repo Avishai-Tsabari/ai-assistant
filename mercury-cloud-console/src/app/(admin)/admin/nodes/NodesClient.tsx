@@ -601,4 +601,5 @@ const smallBtn: React.CSSProperties = {
   border: "1px solid var(--border)",
   cursor: "pointer",
   borderRadius: "4px",
+  color: "inherit",
 };

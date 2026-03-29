@@ -40,6 +40,7 @@ export class WhatsAppBridge implements PlatformBridge {
     const text = msg.text.trim();
     const metadata = msg.metadata as {
       isReplyToBot?: boolean;
+      replyToMessageId?: string;
     };
     const isReplyToBot = metadata?.isReplyToBot ?? false;
 
@@ -83,6 +84,10 @@ export class WhatsAppBridge implements PlatformBridge {
       isDM,
       isReplyToBot,
       attachments,
+      replyToPlatformMessageId: metadata?.replyToMessageId ?? undefined,
+      platformMessageId:
+        (metadata as { platformMessageId?: string })?.platformMessageId ??
+        undefined,
     };
   }
 
@@ -90,29 +95,35 @@ export class WhatsAppBridge implements PlatformBridge {
     threadId: string,
     text: string,
     files?: EgressFile[],
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     if (files && files.length > 0) {
-      await this.sendFiles(threadId, text, files);
+      return this.sendFiles(threadId, text, files);
     } else if (text) {
-      await this.adapter.postMessage(threadId, text);
+      const sent = await this.adapter.postMessage(threadId, text);
+      return sent.id;
     }
+    return undefined;
   }
 
   private async sendFiles(
     threadId: string,
     text: string,
     files: EgressFile[],
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     const { chatJid } = this.adapter.decodeThreadId(threadId);
     const sock = this.adapter.socket;
 
     if (!sock) {
       logger.warn("WhatsApp socket unavailable, falling back to text-only");
-      if (text) await this.adapter.postMessage(threadId, text);
-      return;
+      if (text) {
+        const sent = await this.adapter.postMessage(threadId, text);
+        return sent.id;
+      }
+      return undefined;
     }
 
     let textSent = !text;
+    let lastSentId: string | undefined;
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -132,15 +143,16 @@ export class WhatsAppBridge implements PlatformBridge {
 
       try {
         const mime = file.mimeType;
+        let sent: WAMessage | undefined;
 
         if (mime.startsWith("image/")) {
-          await sock.sendMessage(chatJid, {
+          sent = await sock.sendMessage(chatJid, {
             image: buffer,
             caption,
             mimetype: mime,
           });
         } else if (mime.startsWith("video/")) {
-          await sock.sendMessage(chatJid, {
+          sent = await sock.sendMessage(chatJid, {
             video: buffer,
             caption,
             mimetype: mime,
@@ -149,22 +161,23 @@ export class WhatsAppBridge implements PlatformBridge {
           const base = path.basename(file.filename);
           const ptt =
             base.toLowerCase().endsWith(".ogg") && /^voice-/i.test(base);
-          await sock.sendMessage(chatJid, {
+          sent = await sock.sendMessage(chatJid, {
             audio: buffer,
             mimetype: mime,
             ptt,
           });
           if (caption) {
-            await sock.sendMessage(chatJid, { text: caption });
+            sent = await sock.sendMessage(chatJid, { text: caption });
           }
         } else {
-          await sock.sendMessage(chatJid, {
+          sent = await sock.sendMessage(chatJid, {
             document: buffer,
             fileName: file.filename,
             mimetype: mime,
             caption,
           });
         }
+        if (sent?.key?.id) lastSentId = sent.key.id;
         if (caption) textSent = true;
       } catch (err) {
         logger.error("Failed to send file via WhatsApp", {
@@ -175,7 +188,10 @@ export class WhatsAppBridge implements PlatformBridge {
     }
 
     if (!textSent) {
-      await sock.sendMessage(chatJid, { text });
+      const sent = await sock.sendMessage(chatJid, { text });
+      if (sent?.key?.id) lastSentId = sent.key.id;
     }
+
+    return lastSentId;
   }
 }

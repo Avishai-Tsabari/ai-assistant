@@ -74,7 +74,7 @@ export class TeamsBridge implements PlatformBridge {
     const { externalId, isDM } = this.parseThread(threadId);
 
     // Check reply-to-bot via raw activity
-    const raw = msg.raw as { replyToId?: string } | undefined;
+    const raw = msg.raw as { replyToId?: string; id?: string } | undefined;
     const isReplyToBot = Boolean(raw?.replyToId);
 
     return {
@@ -87,6 +87,8 @@ export class TeamsBridge implements PlatformBridge {
       isDM,
       isReplyToBot,
       attachments,
+      replyToPlatformMessageId: raw?.replyToId ?? undefined,
+      platformMessageId: raw?.id ?? msg.id,
     };
   }
 
@@ -94,19 +96,21 @@ export class TeamsBridge implements PlatformBridge {
     threadId: string,
     text: string,
     files?: EgressFile[],
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     if (files && files.length > 0) {
-      await this.sendWithFiles(threadId, text, files);
+      return this.sendWithFiles(threadId, text, files);
     } else if (text) {
-      await this.adapter.postMessage(threadId, text);
+      const sent = await this.adapter.postMessage(threadId, text);
+      return sent.id;
     }
+    return undefined;
   }
 
   private async sendWithFiles(
     threadId: string,
     text: string,
     files: EgressFile[],
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     // Build file uploads from EgressFile paths
     const fileUploads: { filename: string; mimeType: string; data: Buffer }[] =
       [];
@@ -129,18 +133,21 @@ export class TeamsBridge implements PlatformBridge {
     // Send text + files together via postMessage
     // Teams adapter extracts files from the message object and converts to inline attachments
     try {
-      await this.adapter.postMessage(threadId, {
+      const sent = await this.adapter.postMessage(threadId, {
         markdown: text || "",
         files: fileUploads,
       } as never);
+      return sent.id;
     } catch (err) {
       logger.error("Teams send with files failed", {
         error: err instanceof Error ? err.message : String(err),
       });
       // Fall back to text-only
       if (text) {
-        await this.adapter.postMessage(threadId, text);
+        const sent = await this.adapter.postMessage(threadId, text);
+        return sent.id;
       }
+      return undefined;
     }
   }
 }

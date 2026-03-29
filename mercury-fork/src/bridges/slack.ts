@@ -65,6 +65,21 @@ export class SlackBridge implements PlatformBridge {
 
     const { externalId, isDM } = this.parseThread(threadId);
 
+    // Extract Slack-specific fields from raw event for reply chain tracking
+    const raw = msg.raw as
+      | {
+          ts?: string;
+          thread_ts?: string;
+        }
+      | undefined;
+    const slackTs = raw?.ts;
+    const slackThreadTs = raw?.thread_ts;
+    // In Slack, a threaded reply has thread_ts pointing to the parent message.
+    // isReplyToBot: we can't determine this without knowing the parent author;
+    // will be resolved via platform ID lookup in the runtime.
+    const isReplyToBot =
+      (msg.metadata as { isReplyToBot?: boolean })?.isReplyToBot ?? false;
+
     return {
       platform: "slack",
       spaceId,
@@ -73,8 +88,11 @@ export class SlackBridge implements PlatformBridge {
       authorName: msg.author.userName,
       text,
       isDM,
-      isReplyToBot: false,
+      isReplyToBot,
       attachments,
+      replyToPlatformMessageId:
+        slackThreadTs && slackThreadTs !== slackTs ? slackThreadTs : undefined,
+      platformMessageId: slackTs,
     };
   }
 
@@ -82,14 +100,18 @@ export class SlackBridge implements PlatformBridge {
     threadId: string,
     text: string,
     files?: EgressFile[],
-  ): Promise<void> {
+  ): Promise<string | undefined> {
+    let sentPlatformId: string | undefined;
     if (text) {
-      await this.adapter.postMessage(threadId, text);
+      const sent = await this.adapter.postMessage(threadId, text);
+      sentPlatformId = sent.id;
     }
 
     if (files && files.length > 0) {
       await this.uploadFiles(threadId, files);
     }
+
+    return sentPlatformId;
   }
 
   private async uploadFiles(

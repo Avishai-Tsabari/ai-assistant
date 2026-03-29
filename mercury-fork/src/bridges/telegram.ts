@@ -273,7 +273,8 @@ export class TelegramBridge implements PlatformBridge {
       ?.isReplyToBot;
     const raw = msg.raw as
       | {
-          reply_to_message?: { from?: { id?: number } };
+          message_id?: number;
+          reply_to_message?: { from?: { id?: number }; message_id?: number };
         }
       | undefined;
     const botUserId = (this.adapter as { botUserId?: string }).botUserId;
@@ -303,6 +304,12 @@ export class TelegramBridge implements PlatformBridge {
       isReplyToBot,
       attachments,
       hadIncomingAttachments,
+      replyToPlatformMessageId:
+        raw?.reply_to_message?.message_id != null
+          ? String(raw.reply_to_message.message_id)
+          : undefined,
+      platformMessageId:
+        raw?.message_id != null ? String(raw.message_id) : undefined,
     };
   }
 
@@ -336,21 +343,28 @@ export class TelegramBridge implements PlatformBridge {
     threadId: string,
     text: string,
     files?: EgressFile[],
-  ): Promise<void> {
+  ): Promise<string | undefined> {
+    let sentPlatformId: string | undefined;
     if (text) {
       if (this.formatEnabled) {
-        await this.sendTextMessage(threadId, text);
+        sentPlatformId = await this.sendTextMessage(threadId, text);
       } else {
-        await this.adapter.postMessage(threadId, text);
+        const sent = await this.adapter.postMessage(threadId, text);
+        sentPlatformId = sent.id;
       }
     }
 
     if (files && files.length > 0) {
       await this.uploadFiles(threadId, files);
     }
+
+    return sentPlatformId;
   }
 
-  private async sendTextMessage(threadId: string, text: string): Promise<void> {
+  private async sendTextMessage(
+    threadId: string,
+    text: string,
+  ): Promise<string | undefined> {
     const { chatId, messageThreadId } = this.parseThreadId(threadId);
     let formatted: string;
     try {
@@ -383,21 +397,27 @@ export class TelegramBridge implements PlatformBridge {
           status: resp.status,
           error: errText,
         });
-      } else {
-        const result = (await resp.json()) as {
-          ok?: boolean;
-          description?: string;
-        };
-        if (!result.ok) {
-          logger.error("Telegram sendMessage API error", {
-            error: result.description,
-          });
-        }
+        return undefined;
       }
+      const result = (await resp.json()) as {
+        ok?: boolean;
+        description?: string;
+        result?: { message_id?: number };
+      };
+      if (!result.ok) {
+        logger.error("Telegram sendMessage API error", {
+          error: result.description,
+        });
+        return undefined;
+      }
+      return result.result?.message_id != null
+        ? String(result.result.message_id)
+        : undefined;
     } catch (err) {
       logger.error("Telegram sendMessage failed", {
         error: err instanceof Error ? err.message : String(err),
       });
+      return undefined;
     }
   }
 

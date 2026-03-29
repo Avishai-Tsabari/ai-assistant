@@ -6,6 +6,8 @@ export const BUILTIN_CONFIG_KEYS = new Set([
   "trigger.case_sensitive",
   "trigger.media_in_groups",
   "ambient.enabled",
+  "context.mode",
+  "context.reply_chain_depth",
 ]);
 
 const BUILTIN_VALIDATORS: Record<string, (v: string) => string | null> = {
@@ -25,6 +27,16 @@ const BUILTIN_VALIDATORS: Record<string, (v: string) => string | null> = {
     ["true", "false"].includes(v)
       ? null
       : "Invalid ambient.enabled value. Valid: true, false",
+  "context.mode": (v) =>
+    ["clear", "context"].includes(v)
+      ? null
+      : "Invalid context.mode value. Valid: clear, context",
+  "context.reply_chain_depth": (v) => {
+    const n = Number.parseInt(v, 10);
+    return Number.isInteger(n) && n >= 1 && n <= 50
+      ? null
+      : "Invalid context.reply_chain_depth value. Must be an integer between 1 and 50";
+  },
 };
 
 export function isBuiltinConfigKey(key: string): boolean {

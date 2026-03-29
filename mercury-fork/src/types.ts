@@ -225,6 +225,8 @@ export interface ContainerResult {
   files: EgressFile[];
   /** Token usage from the model provider, if available */
   usage?: TokenUsage;
+  /** Mercury message ID of the stored assistant reply (set by runtime, used for platform ID mapping) */
+  assistantMessageId?: number;
 }
 
 /**

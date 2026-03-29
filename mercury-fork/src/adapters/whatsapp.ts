@@ -554,9 +554,13 @@ export class WhatsAppBaileysAdapter
           Number(msg.messageTimestamp ?? Date.now() / 1000) * 1000,
         ),
         edited: false,
-        // Store reply flag in metadata for downstream consumers
+        // Store reply flag and platform IDs in metadata for downstream consumers
         // Using spread to add custom properties (not in MessageMetadata type)
-        ...({ isReplyToBot } as Record<string, unknown>),
+        ...({
+          isReplyToBot,
+          replyToMessageId: contextInfo?.stanzaId ?? undefined,
+          platformMessageId: msg.key.id ?? undefined,
+        } as Record<string, unknown>),
       },
       attachments: [],
     });

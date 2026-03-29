@@ -44,8 +44,12 @@ export class DiscordBridge implements PlatformBridge {
       );
     }
 
-    const isReplyToBot =
-      (msg.metadata as { isReplyToBot?: boolean })?.isReplyToBot ?? false;
+    const metadata = msg.metadata as {
+      isReplyToBot?: boolean;
+      replyToMessageId?: string;
+      platformMessageId?: string;
+    };
+    const isReplyToBot = metadata?.isReplyToBot ?? false;
 
     const attachments: MessageAttachment[] = [];
     if (ctx.media.enabled && rawAttachments.length > 0) {
@@ -80,6 +84,8 @@ export class DiscordBridge implements PlatformBridge {
       isDM,
       isReplyToBot,
       attachments,
+      replyToPlatformMessageId: metadata?.replyToMessageId ?? undefined,
+      platformMessageId: metadata?.platformMessageId ?? undefined,
     };
   }
 
@@ -87,19 +93,21 @@ export class DiscordBridge implements PlatformBridge {
     threadId: string,
     text: string,
     files?: EgressFile[],
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     if (files && files.length > 0) {
-      await this.sendWithFiles(threadId, text, files);
+      return this.sendWithFiles(threadId, text, files);
     } else if (text) {
-      await this.adapter.postMessage(threadId, text);
+      const sent = await this.adapter.postMessage(threadId, text);
+      return sent.id;
     }
+    return undefined;
   }
 
   private async sendWithFiles(
     threadId: string,
     text: string,
     files: EgressFile[],
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     const client = this.adapter.discordClient;
     const { channelId, threadId: discordThreadId } =
       this.adapter.decodeThreadId(threadId);
@@ -111,8 +119,11 @@ export class DiscordBridge implements PlatformBridge {
         logger.warn("Discord channel not sendable, falling back to text-only", {
           targetId,
         });
-        if (text) await this.adapter.postMessage(threadId, text);
-        return;
+        if (text) {
+          const sent = await this.adapter.postMessage(threadId, text);
+          return sent.id;
+        }
+        return undefined;
       }
 
       const discordFiles = files.map((f) => ({
@@ -120,15 +131,22 @@ export class DiscordBridge implements PlatformBridge {
         name: f.filename,
       }));
 
-      await (channel as { send: (opts: unknown) => Promise<unknown> }).send({
+      const sent = await (
+        channel as { send: (opts: unknown) => Promise<{ id: string }> }
+      ).send({
         content: text || undefined,
         files: discordFiles,
       });
+      return sent?.id;
     } catch (err) {
       logger.error("Failed to send files via Discord", {
         error: err instanceof Error ? err.message : String(err),
       });
-      if (text) await this.adapter.postMessage(threadId, text);
+      if (text) {
+        const sent = await this.adapter.postMessage(threadId, text);
+        return sent.id;
+      }
+      return undefined;
     }
   }
 }

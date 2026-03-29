@@ -14,6 +14,10 @@ import {
   resolveExamplesExtensionDir,
 } from "../../extensions/installer.js";
 import type { Db } from "../../storage/db.js";
+import {
+  isBuiltinConfigKey,
+  validateBuiltinConfigValue,
+} from "./config-builtin.js";
 import { ensureSpacesDirExists, getStorageInfo } from "./storage.js";
 
 /* ── Adapter configuration helpers ──────────────────────────────── */
@@ -352,6 +356,56 @@ export function createConsoleApp(opts: {
       dbPath: opts.dbPath,
     });
     return c.json(info);
+  });
+
+  /* ── Space config management ────────────────────────────────── */
+
+  app.get("/spaces", (c) => {
+    if (!opts.db) {
+      return c.json({ error: "Database not available" }, 503);
+    }
+    const spaces = opts.db.listSpaces();
+    return c.json({ spaces });
+  });
+
+  app.get("/spaces/:spaceId/config", (c) => {
+    if (!opts.db) {
+      return c.json({ error: "Database not available" }, 503);
+    }
+    const spaceId = c.req.param("spaceId");
+    const config: Record<string, string> = {};
+    for (const entry of opts.db.listSpaceConfig(spaceId)) {
+      config[entry.key] = entry.value;
+    }
+    return c.json({ spaceId, config });
+  });
+
+  app.put("/spaces/:spaceId/config", async (c) => {
+    if (!opts.db) {
+      return c.json({ error: "Database not available" }, 503);
+    }
+    const spaceId = c.req.param("spaceId");
+    const body = (await c.req.json().catch(() => ({}))) as {
+      key?: string;
+      value?: string;
+    };
+    const key = typeof body.key === "string" ? body.key.trim() : "";
+    const value = typeof body.value === "string" ? body.value : "";
+
+    if (!key) {
+      return c.json({ error: "key is required" }, 400);
+    }
+
+    // Validate against built-in keys
+    if (isBuiltinConfigKey(key)) {
+      const err = validateBuiltinConfigValue(key, value);
+      if (err) {
+        return c.json({ error: err }, 400);
+      }
+    }
+
+    opts.db.setSpaceConfig(spaceId, key, value, "console");
+    return c.json({ ok: true });
   });
 
   return app;

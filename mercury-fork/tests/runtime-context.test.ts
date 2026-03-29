@@ -114,6 +114,8 @@ describe("Runtime sliding window context", () => {
   });
 
   test("sliding window includes prior messages in chronological order", async () => {
+    // Set context mode to "context" so the sliding window is used
+    runtime.db.setSpaceConfig("test-group", "context.mode", "context", "test");
     // Store a prior turn in the DB
     runtime.db.addMessage("test-group", "user", "Earlier message");
     runtime.db.addMessage("test-group", "assistant", "Earlier reply");

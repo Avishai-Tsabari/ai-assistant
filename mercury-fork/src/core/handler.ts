@@ -110,13 +110,27 @@ export function createMessageHandler(opts: MessageHandlerOptions) {
       }
 
       if (result.result) {
-        const { reply, files } = result.result;
+        const { reply, files, assistantMessageId } = result.result;
         if (reply || files.length > 0) {
-          await bridge.sendReply(
+          const sentPlatformId = await bridge.sendReply(
             threadId,
             reply,
             files.length > 0 ? files : undefined,
           );
+
+          // Record the platform message ID mapping for the bot's outbound message
+          if (
+            sentPlatformId &&
+            assistantMessageId &&
+            ingress.conversationExternalId
+          ) {
+            core.recordOutboundPlatformId(
+              assistantMessageId,
+              bridge.platform,
+              ingress.conversationExternalId,
+              sentPlatformId,
+            );
+          }
         }
       }
     } catch (err) {

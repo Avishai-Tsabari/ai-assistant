@@ -25,8 +25,8 @@ import {
   isBuiltinConfigKey,
   validateDashboardBuiltinConfig,
 } from "./config-builtin.js";
-import { validatePrefKey, validatePrefValue } from "./prefs.js";
 import { updateDotEnv } from "./console.js";
+import { validatePrefKey, validatePrefValue } from "./prefs.js";
 
 const VOICE_TRANSCRIBE_EXT = "voice-transcribe";
 const VT_KEY = {
@@ -109,13 +109,48 @@ export function createDashboardRoutes(ctx: DashboardContext) {
   } = ctx;
   const app = new Hono();
 
-  const MODEL_PROVIDERS: { id: string; label: string; envVar: string; placeholder: string }[] = [
-    { id: "anthropic",  label: "Anthropic",      envVar: "MERCURY_ANTHROPIC_API_KEY",  placeholder: "sk-ant-..." },
-    { id: "openai",     label: "OpenAI",          envVar: "MERCURY_OPENAI_API_KEY",     placeholder: "sk-..." },
-    { id: "google",     label: "Google Gemini",   envVar: "MERCURY_GEMINI_API_KEY",     placeholder: "AIza..." },
-    { id: "groq",       label: "Groq",            envVar: "MERCURY_GROQ_API_KEY",       placeholder: "gsk_..." },
-    { id: "mistral",    label: "Mistral",         envVar: "MERCURY_MISTRAL_API_KEY",    placeholder: "..." },
-    { id: "openrouter", label: "OpenRouter",      envVar: "MERCURY_OPENROUTER_API_KEY", placeholder: "sk-or-..." },
+  const MODEL_PROVIDERS: {
+    id: string;
+    label: string;
+    envVar: string;
+    placeholder: string;
+  }[] = [
+    {
+      id: "anthropic",
+      label: "Anthropic",
+      envVar: "MERCURY_ANTHROPIC_API_KEY",
+      placeholder: "sk-ant-...",
+    },
+    {
+      id: "openai",
+      label: "OpenAI",
+      envVar: "MERCURY_OPENAI_API_KEY",
+      placeholder: "sk-...",
+    },
+    {
+      id: "google",
+      label: "Google Gemini",
+      envVar: "MERCURY_GEMINI_API_KEY",
+      placeholder: "AIza...",
+    },
+    {
+      id: "groq",
+      label: "Groq",
+      envVar: "MERCURY_GROQ_API_KEY",
+      placeholder: "gsk_...",
+    },
+    {
+      id: "mistral",
+      label: "Mistral",
+      envVar: "MERCURY_MISTRAL_API_KEY",
+      placeholder: "...",
+    },
+    {
+      id: "openrouter",
+      label: "OpenRouter",
+      envVar: "MERCURY_OPENROUTER_API_KEY",
+      placeholder: "sk-or-...",
+    },
   ];
 
   // ─── Helpers ────────────────────────────────────────────────────────────
@@ -1612,7 +1647,8 @@ export function createDashboardRoutes(ctx: DashboardContext) {
 
   app.post("/api/keys/set", async (c) => {
     const form = await c.req.parseBody();
-    const provider = typeof form.provider === "string" ? form.provider.trim() : "";
+    const provider =
+      typeof form.provider === "string" ? form.provider.trim() : "";
     const apiKey = typeof form.apiKey === "string" ? form.apiKey.trim() : "";
 
     const meta = MODEL_PROVIDERS.find((p) => p.id === provider);
@@ -1628,16 +1664,21 @@ export function createDashboardRoutes(ctx: DashboardContext) {
       updateDotEnv(envPath, { [meta.envVar]: apiKey });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return c.html(renderFeaturesToast("error", `Failed to write .env: ${msg}`));
+      return c.html(
+        renderFeaturesToast("error", `Failed to write .env: ${msg}`),
+      );
     }
 
     setTimeout(() => process.kill(process.pid, "SIGTERM"), 500);
-    return c.html(renderFeaturesToast("success", `${meta.label} key saved — restarting…`));
+    return c.html(
+      renderFeaturesToast("success", `${meta.label} key saved — restarting…`),
+    );
   });
 
   app.post("/api/keys/clear", async (c) => {
     const form = await c.req.parseBody();
-    const provider = typeof form.provider === "string" ? form.provider.trim() : "";
+    const provider =
+      typeof form.provider === "string" ? form.provider.trim() : "";
 
     const meta = MODEL_PROVIDERS.find((p) => p.id === provider);
     if (!meta) {
@@ -1649,11 +1690,15 @@ export function createDashboardRoutes(ctx: DashboardContext) {
       updateDotEnv(envPath, { [meta.envVar]: null });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return c.html(renderFeaturesToast("error", `Failed to write .env: ${msg}`));
+      return c.html(
+        renderFeaturesToast("error", `Failed to write .env: ${msg}`),
+      );
     }
 
     setTimeout(() => process.kill(process.pid, "SIGTERM"), 500);
-    return c.html(renderFeaturesToast("success", `${meta.label} key cleared — restarting…`));
+    return c.html(
+      renderFeaturesToast("success", `${meta.label} key cleared — restarting…`),
+    );
   });
 
   // ─── SSE Stream ─────────────────────────────────────────────────────────

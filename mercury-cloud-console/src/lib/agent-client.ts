@@ -157,6 +157,73 @@ export async function installExtensionOnAgent(opts: {
   return { ok: true };
 }
 
+/* ── Space config management ─────────────────────────────────── */
+
+export type AgentSpace = {
+  id: string;
+  name: string;
+  createdAt: number;
+};
+
+export async function fetchAgentSpaces(opts: {
+  agentBaseUrl: string;
+  apiSecret: string;
+  signal?: AbortSignal;
+}): Promise<{ spaces: AgentSpace[] }> {
+  const url = `${opts.agentBaseUrl.replace(/\/$/, "")}/api/console/spaces`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${opts.apiSecret}` },
+    signal: opts.signal,
+  });
+  if (!res.ok) {
+    throw new Error(`Spaces fetch failed: ${res.status}`);
+  }
+  return (await res.json()) as { spaces: AgentSpace[] };
+}
+
+export async function fetchSpaceConfig(opts: {
+  agentBaseUrl: string;
+  apiSecret: string;
+  spaceId: string;
+  signal?: AbortSignal;
+}): Promise<{ spaceId: string; config: Record<string, string> }> {
+  const url = `${opts.agentBaseUrl.replace(/\/$/, "")}/api/console/spaces/${encodeURIComponent(opts.spaceId)}/config`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${opts.apiSecret}` },
+    signal: opts.signal,
+  });
+  if (!res.ok) {
+    throw new Error(`Space config fetch failed: ${res.status}`);
+  }
+  return (await res.json()) as { spaceId: string; config: Record<string, string> };
+}
+
+export async function setSpaceConfig(opts: {
+  agentBaseUrl: string;
+  apiSecret: string;
+  spaceId: string;
+  key: string;
+  value: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const url = `${opts.agentBaseUrl.replace(/\/$/, "")}/api/console/spaces/${encodeURIComponent(opts.spaceId)}/config`;
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${opts.apiSecret}`,
+    },
+    body: JSON.stringify({ key: opts.key, value: opts.value }),
+  });
+  const j = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+  };
+  if (!res.ok) {
+    return { ok: false, error: j.error ?? res.statusText };
+  }
+  return { ok: true };
+}
+
 /* ── Usage ───────────────────────────────────────────────────── */
 
 const USAGE_TIMEOUT_MS = 8_000;

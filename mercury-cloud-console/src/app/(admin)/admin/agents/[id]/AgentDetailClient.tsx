@@ -178,6 +178,9 @@ export function AgentDetailClient({ agent }: { agent: Agent }) {
         <AdaptersCard agentId={agent.id} dashboardUrl={agent.dashboardUrl} onSaved={fetchHealth} />
       )}
 
+      {/* Spaces */}
+      {!isDeprovisioned && <SpacesCard agentId={agent.id} />}
+
       {/* Actions */}
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Actions</h3>
@@ -499,6 +502,185 @@ function AdaptersCard({
                     })}
                   </div>
                 )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Spaces Card ───────────────────────────────────────────── */
+
+type SpaceWithConfig = {
+  id: string;
+  name: string;
+  createdAt: number;
+  config: Record<string, string>;
+};
+
+function SpacesCard({ agentId }: { agentId: string }) {
+  const [spaces, setSpaces] = useState<SpaceWithConfig[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState<string | null>(null); // spaceId currently saving
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const fetchSpaces = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/agents/${agentId}/spaces`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      const data = await res.json();
+      setSpaces(data.spaces ?? []);
+    } catch {
+      setError("Failed to fetch spaces");
+    } finally {
+      setLoading(false);
+    }
+  }, [agentId]);
+
+  useEffect(() => {
+    fetchSpaces();
+  }, [fetchSpaces]);
+
+  const handleConfigChange = async (spaceId: string, key: string, value: string) => {
+    setSaving(spaceId);
+    setSaveError(null);
+    try {
+      const res = await fetch(`/api/admin/agents/${agentId}/spaces`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spaceId, key, value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSaveError(data.error ?? `HTTP ${res.status}`);
+        setSaving(null);
+        return;
+      }
+      // Update local state
+      setSpaces((prev) =>
+        prev.map((s) =>
+          s.id === spaceId ? { ...s, config: { ...s.config, [key]: value } } : s,
+        ),
+      );
+    } catch {
+      setSaveError("Failed to save");
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  return (
+    <div className="card" style={{ marginBottom: "1rem" }}>
+      <h3 style={{ marginTop: 0 }}>Spaces</h3>
+
+      {saveError && (
+        <p style={{ color: "#f85149", fontSize: "0.85rem", margin: "0.5rem 0" }}>
+          {saveError}
+        </p>
+      )}
+
+      {loading ? (
+        <p className="muted">Loading spaces...</p>
+      ) : error ? (
+        <div>
+          <p style={{ color: "#f85149", fontSize: "0.85rem" }}>{error}</p>
+          <button onClick={fetchSpaces} style={{ marginTop: "0.5rem", fontSize: "0.85rem" }}>
+            Retry
+          </button>
+        </div>
+      ) : spaces.length === 0 ? (
+        <p className="muted">No spaces configured on this agent.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "0.5rem" }}>
+          {spaces.map((space) => {
+            const contextMode = space.config["context.mode"] ?? "clear";
+            const chainDepth = space.config["context.reply_chain_depth"] ?? "10";
+            const isSaving = saving === space.id;
+
+            return (
+              <div
+                key={space.id}
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: "6px",
+                  padding: "0.75rem",
+                  opacity: isSaving ? 0.6 : 1,
+                }}
+              >
+                <strong style={{ fontSize: "0.9rem" }}>{space.name || space.id}</strong>
+                {space.name && space.name !== space.id && (
+                  <span className="muted" style={{ fontSize: "0.8rem", marginLeft: "0.5rem" }}>
+                    ({space.id})
+                  </span>
+                )}
+
+                <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <label
+                      style={{ fontSize: "0.8rem", width: "140px", flexShrink: 0, textAlign: "right" }}
+                      className="muted"
+                    >
+                      Context Mode:
+                    </label>
+                    <select
+                      value={contextMode}
+                      onChange={(e) => handleConfigChange(space.id, "context.mode", e.target.value)}
+                      disabled={isSaving}
+                      style={{
+                        padding: "0.35rem 0.5rem",
+                        fontSize: "0.85rem",
+                        borderRadius: "4px",
+                        border: "1px solid var(--border)",
+                        background: "var(--bg)",
+                        color: "var(--text)",
+                      }}
+                    >
+                      <option value="clear">Clear (reply-chain only)</option>
+                      <option value="context">Context (sliding window)</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <label
+                      style={{ fontSize: "0.8rem", width: "140px", flexShrink: 0, textAlign: "right" }}
+                      className="muted"
+                    >
+                      Reply Chain Depth:
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={chainDepth}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const num = parseInt(val, 10);
+                        if (num >= 1 && num <= 50) {
+                          handleConfigChange(space.id, "context.reply_chain_depth", String(num));
+                        }
+                      }}
+                      disabled={isSaving}
+                      style={{
+                        width: "70px",
+                        padding: "0.35rem 0.5rem",
+                        fontSize: "0.85rem",
+                        borderRadius: "4px",
+                        border: "1px solid var(--border)",
+                        background: "var(--bg)",
+                        color: "var(--text)",
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
             );
           })}

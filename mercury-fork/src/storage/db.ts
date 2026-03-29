@@ -264,6 +264,7 @@ export class Db {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       runMeta,
+      replyToId: row.replyToId ?? undefined,
     };
   }
 
@@ -582,6 +583,7 @@ export class Db {
     role: StoredMessage["role"],
     content: string,
     attachments?: MessageAttachment[],
+    replyToId?: number,
   ): number {
     const now = Date.now();
     const attachmentsJson =
@@ -590,15 +592,88 @@ export class Db {
         : null;
     this.db
       .query(
-        `INSERT INTO messages(space_id, role, content, attachments, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO messages(space_id, role, content, attachments, reply_to_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(spaceId, role, content, attachmentsJson, now, now);
+      .run(
+        spaceId,
+        role,
+        content,
+        attachmentsJson,
+        replyToId ?? null,
+        now,
+        now,
+      );
     const row = this.db.query("SELECT last_insert_rowid() as id").get() as {
       id: number;
     } | null;
     if (!row) throw new Error("Failed to read message id");
     return Number(row.id);
+  }
+
+  // ── Platform message ID mapping (for reply-chain tracking) ────────────
+
+  addPlatformMessageId(
+    mercuryMessageId: number,
+    platform: string,
+    conversationExternalId: string,
+    platformMessageId: string,
+  ): void {
+    this.db
+      .query(
+        `INSERT OR IGNORE INTO message_platform_ids(mercury_message_id, platform, conversation_external_id, platform_message_id, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(
+        mercuryMessageId,
+        platform,
+        conversationExternalId,
+        platformMessageId,
+        Date.now(),
+      );
+  }
+
+  lookupMercuryMessageId(
+    platform: string,
+    conversationExternalId: string,
+    platformMessageId: string,
+  ): number | null {
+    const row = this.db
+      .query(
+        `SELECT mercury_message_id FROM message_platform_ids
+         WHERE platform = ? AND conversation_external_id = ? AND platform_message_id = ?`,
+      )
+      .get(platform, conversationExternalId, platformMessageId) as {
+      mercury_message_id: number;
+    } | null;
+    return row ? row.mercury_message_id : null;
+  }
+
+  /**
+   * Walk reply_to_id pointers backward from a message, collecting up to
+   * maxDepth turns (each turn = user + assistant pair). Returns messages
+   * in chronological order (oldest first).
+   */
+  getReplyChain(messageId: number, maxDepth: number): StoredMessage[] {
+    const chain: StoredMessage[] = [];
+    let currentId: number | null = messageId;
+    const maxMessages = maxDepth * 2; // each turn = user + assistant
+
+    while (currentId !== null && chain.length < maxMessages) {
+      const row = this.db
+        .query(
+          `SELECT id, space_id as spaceId, role, content, attachments, run_meta as runMeta,
+                  reply_to_id as replyToId, created_at as createdAt, updated_at as updatedAt
+           FROM messages WHERE id = ?`,
+        )
+        .get(currentId) as MessageRow | null;
+      if (!row) break;
+      chain.push(this.parseMessageRow(row));
+      currentId = row.replyToId;
+    }
+
+    // Reverse to chronological order (oldest first)
+    return chain.reverse();
   }
 
   updateMessageRunMeta(messageId: number, meta: MessageRunMeta): void {
@@ -689,6 +764,7 @@ export class Db {
            content,
            attachments,
            run_meta as runMeta,
+           reply_to_id as replyToId,
            created_at as createdAt,
            updated_at as updatedAt
          FROM messages
@@ -739,6 +815,7 @@ export class Db {
            content,
            attachments,
            run_meta as runMeta,
+           reply_to_id as replyToId,
            created_at as createdAt,
            updated_at as updatedAt
          FROM messages
@@ -768,6 +845,7 @@ export class Db {
            content,
            attachments,
            run_meta as runMeta,
+           reply_to_id as replyToId,
            created_at as createdAt,
            updated_at as updatedAt
          FROM messages
@@ -816,6 +894,7 @@ export class Db {
            content,
            attachments,
            run_meta as runMeta,
+           reply_to_id as replyToId,
            created_at as createdAt,
            updated_at as updatedAt
          FROM messages

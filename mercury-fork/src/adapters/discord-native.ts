@@ -473,8 +473,12 @@ export class DiscordNativeAdapter
       metadata: {
         dateSent: msg.createdAt,
         edited: msg.editedAt !== null,
-        // Store reply flag in metadata for downstream consumers
-        ...({ isReplyToBot } as Record<string, unknown>),
+        // Store reply flag and platform IDs in metadata for downstream consumers
+        ...({
+          isReplyToBot,
+          replyToMessageId: msg.reference?.messageId ?? undefined,
+          platformMessageId: msg.id,
+        } as Record<string, unknown>),
       },
       attachments: msg.attachments.map((a) => ({
         type: this.getAttachmentType(a.contentType),
