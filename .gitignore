@@ -39,6 +39,9 @@ mercury-assistant/.mercury/state.db*
 .DS_Store
 Thumbs.db
 
+# Claude Code
+.claude/worktrees/
+
 # IDE
 .idea/
 .vscode/
