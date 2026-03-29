@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { fmtBytes } from "@/lib/format";
 
@@ -56,10 +57,14 @@ function DiskBadge({ usedPercent, freeBytes }: { usedPercent: number; freeBytes:
 }
 
 export default function AgentCard({ agent }: { agent: Agent }) {
+  const router = useRouter();
   const [status, setStatus] = useState<ContainerStatus>(agent.containerStatus);
   const [loading, setLoading] = useState<"stop" | "restart" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [disk, setDisk] = useState<{ usedPercent: number; freeBytes: number } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleted, setDeleted] = useState(false);
 
   const isContainer = Boolean(agent.nodeId);
 
@@ -76,6 +81,24 @@ export default function AgentCard({ agent }: { agent: Agent }) {
       .catch(() => null);
     return () => ac.abort();
   }, [agent.id, agent.healthUrl]);
+
+  async function handleDelete() {
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/user/agents/${agent.id}/deprovision`, { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? "Delete failed");
+      }
+      setDeleted(true);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }
 
   async function handleAction(action: "stop" | "restart") {
     setLoading(action);
@@ -108,6 +131,8 @@ export default function AgentCard({ agent }: { agent: Agent }) {
       setLoading(null);
     }
   }
+
+  if (deleted) return null;
 
   return (
     <li
@@ -143,15 +168,16 @@ export default function AgentCard({ agent }: { agent: Agent }) {
           {isContainer && status !== "stopped" && (
             <button
               type="button"
-              disabled={loading !== null}
+              disabled={loading !== null || deleting}
               onClick={() => handleAction("stop")}
               style={{
                 fontSize: "0.8rem",
                 padding: "3px 10px",
                 background: "transparent",
+                color: "var(--text, #e6edf3)",
                 border: "1px solid var(--border, #30363d)",
-                cursor: loading ? "not-allowed" : "pointer",
-                opacity: loading ? 0.6 : 1,
+                cursor: (loading !== null || deleting) ? "not-allowed" : "pointer",
+                opacity: (loading !== null || deleting) ? 0.6 : 1,
               }}
             >
               {loading === "stop" ? "Stopping…" : "Stop"}
@@ -161,19 +187,75 @@ export default function AgentCard({ agent }: { agent: Agent }) {
           {isContainer && (
             <button
               type="button"
-              disabled={loading !== null}
+              disabled={loading !== null || deleting}
               onClick={() => handleAction("restart")}
               style={{
                 fontSize: "0.8rem",
                 padding: "3px 10px",
                 background: "transparent",
+                color: "var(--text, #e6edf3)",
                 border: "1px solid var(--border, #30363d)",
-                cursor: loading ? "not-allowed" : "pointer",
-                opacity: loading ? 0.6 : 1,
+                cursor: (loading !== null || deleting) ? "not-allowed" : "pointer",
+                opacity: (loading !== null || deleting) ? 0.6 : 1,
               }}
             >
               {loading === "restart" ? "Restarting…" : "Restart"}
             </button>
+          )}
+
+          {!confirmDelete ? (
+            <button
+              type="button"
+              disabled={loading !== null || deleting}
+              onClick={() => setConfirmDelete(true)}
+              style={{
+                fontSize: "0.8rem",
+                padding: "3px 10px",
+                background: "transparent",
+                color: "#f85149",
+                border: "1px solid #f85149",
+                cursor: (loading !== null || deleting) ? "not-allowed" : "pointer",
+                opacity: (loading !== null || deleting) ? 0.6 : 1,
+              }}
+            >
+              Delete
+            </button>
+          ) : (
+            <>
+              <span style={{ fontSize: "0.8rem", color: "var(--text, #e6edf3)" }}>Delete this agent?</span>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={handleDelete}
+                style={{
+                  fontSize: "0.8rem",
+                  padding: "3px 10px",
+                  background: "transparent",
+                  color: "#f85149",
+                  border: "1px solid #f85149",
+                  cursor: deleting ? "not-allowed" : "pointer",
+                  opacity: deleting ? 0.6 : 1,
+                }}
+              >
+                {deleting ? "Deleting…" : "Confirm"}
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setConfirmDelete(false)}
+                style={{
+                  fontSize: "0.8rem",
+                  padding: "3px 10px",
+                  background: "transparent",
+                  color: "var(--text, #e6edf3)",
+                  border: "1px solid var(--border, #30363d)",
+                  cursor: deleting ? "not-allowed" : "pointer",
+                  opacity: deleting ? 0.6 : 1,
+                }}
+              >
+                Cancel
+              </button>
+            </>
           )}
         </div>
       </div>

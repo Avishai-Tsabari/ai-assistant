@@ -55,6 +55,18 @@ button {
   cursor: pointer;
 }
 
+/*
+ * Use .btn-outline for secondary/ghost buttons on dark backgrounds.
+ * Do NOT just set `background: transparent` without also setting `color` —
+ * the default button color (#0d1117) is invisible on dark backgrounds.
+ */
+button.btn-outline {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-weight: 400;
+}
+
 .card {
   border: 1px solid var(--border);
   border-radius: 8px;
