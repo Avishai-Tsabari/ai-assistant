@@ -6,11 +6,10 @@
 
 import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
-import type { ProvisionProgress, ProvisionRequest } from "@/lib/provisioner";
 import { renderMercuryEnvRecord } from "@/lib/env-renderer";
 import { selectNode } from "@/lib/node-scheduler";
 import { NodeClient } from "@/lib/node-client";
-import { TIER_RESOURCES } from "@/lib/tiers";
+import { TIER_RESOURCES, type AgentTier } from "@/lib/tiers";
 import {
   getDb,
   agents as agentsTable,
@@ -19,6 +18,34 @@ import {
   users,
 } from "@/lib/db";
 import { encryptSecret, getMasterKey } from "@/lib/encryption";
+
+export type ProvisionProgress =
+  | { type: "progress"; message: string }
+  | {
+      type: "done";
+      agentId: string;
+      ipv4: string;
+      dashboardUrl: string;
+      status: "healthy" | "provisioning_in_progress";
+    }
+  | { type: "error"; message: string };
+
+export type ModelChainEntry = {
+  provider: string;
+  apiKey: string;
+  model: string;
+  envVarOverride?: string;
+};
+
+export type ProvisionRequest = {
+  userId: string;
+  hostname: string;
+  modelChain: ModelChainEntry[];
+  extensionIds: string[];
+  extensionsRepo?: string;
+  tier?: AgentTier;
+  optionalEnv?: Record<string, string>;
+};
 
 /**
  * Poll an agent's /health endpoint until it returns { status: "ok" }.

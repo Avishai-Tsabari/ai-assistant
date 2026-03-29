@@ -1,9 +1,4 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { providerEnvVar } from "@/lib/providers";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export type ResolvedProviderKey = {
   provider: string;
@@ -18,53 +13,15 @@ export type ModelChainLeg = {
 };
 
 export type AgentEnvInput = {
-  /** Resolved (plaintext) provider API keys to inject */
   resolvedKeys: ResolvedProviderKey[];
-  /** Ordered model chain for MERCURY_MODEL_CHAIN */
   modelChain: ModelChainLeg[];
   apiSecret: string;
   agentImage: string;
-  /** KEY=value lines for optional extension env */
-  optionalLines?: string[];
+  optionalEnv?: Record<string, string>;
+  agentId?: string;
 };
 
-export function loadEnvTemplate(): string {
-  const p = join(__dirname, "../../infra/mercury.env.tmpl");
-  return readFileSync(p, "utf8");
-}
-
-export function renderMercuryEnv(input: AgentEnvInput): string {
-  const providerKeyLines = input.resolvedKeys
-    .map(({ provider, apiKey, envVarOverride }) => `${envVarOverride ?? providerEnvVar(provider)}=${apiKey}`)
-    .join("\n");
-
-  const modelChainJson = JSON.stringify(
-    input.modelChain.map(({ provider, model }) => ({ provider, model })),
-  );
-
-  const optional =
-    input.optionalLines?.filter(Boolean).join("\n") ?? "# (none)";
-
-  return loadEnvTemplate()
-    .replace("{{PROVIDER_KEY_LINES}}", providerKeyLines || "# (no provider keys configured)")
-    .replace("{{MERCURY_MODEL_CHAIN}}", modelChainJson)
-    .replace("{{MERCURY_API_SECRET}}", input.apiSecret)
-    .replace("{{MERCURY_AGENT_IMAGE}}", input.agentImage)
-    .replace("{{OPTIONAL_ENV_LINES}}", optional);
-}
-
-/**
- * Render agent environment as a Record<string, string> for container mode.
- * Same data as renderMercuryEnv but returns a key-value map instead of a
- * template-substituted file string — suitable for passing as Docker env vars.
- */
-export function renderMercuryEnvRecord(
-  input: Omit<AgentEnvInput, "optionalLines"> & {
-    optionalEnv?: Record<string, string>;
-    /** Unique agent ID injected as MERCURY_AGENT_ID for inner-container namespacing */
-    agentId?: string;
-  },
-): Record<string, string> {
+export function renderMercuryEnvRecord(input: AgentEnvInput): Record<string, string> {
   const env: Record<string, string> = {};
 
   // Provider API keys

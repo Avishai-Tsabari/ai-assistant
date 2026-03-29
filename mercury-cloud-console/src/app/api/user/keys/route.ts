@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { auth } from "@/auth";
 import { assertUserOrThrow } from "@/lib/admin-guard";
 import { getDb, providerKeys } from "@/lib/db";
@@ -46,6 +46,20 @@ export async function POST(request: Request) {
   }
   if (!apiKey || typeof apiKey !== "string" || !apiKey.trim()) {
     return NextResponse.json({ error: "apiKey is required" }, { status: 400 });
+  }
+
+  // Check for existing key with the same provider
+  const existing = await getDb()
+    .select({ id: providerKeys.id })
+    .from(providerKeys)
+    .where(and(eq(providerKeys.userId, userId), eq(providerKeys.provider, provider.trim())))
+    .get();
+
+  if (existing) {
+    return NextResponse.json(
+      { error: `You already have a key saved for this provider. Delete the existing one first if you want to replace it.` },
+      { status: 409 },
+    );
   }
 
   const masterKey = getMasterKey();

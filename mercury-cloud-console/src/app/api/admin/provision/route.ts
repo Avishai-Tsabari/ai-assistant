@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { assertAdminOrThrow } from "@/lib/admin-guard";
 import { getDb, users } from "@/lib/db";
-import { provisionAgent } from "@/lib/provisioner";
 import { provisionAgentContainer } from "@/lib/container-provisioner";
 
 export const runtime = "nodejs";
@@ -64,14 +63,7 @@ export async function POST(request: Request) {
       }
 
       try {
-        const useContainerMode =
-          process.env.PROVISIONER_MODE === "container";
-
-        const provisionFn = useContainerMode
-          ? provisionAgentContainer
-          : provisionAgent;
-
-        const gen = provisionFn({
+        const gen = provisionAgentContainer({
           userId: userId as string,
           hostname: hostname as string,
           modelChain: modelChain as { provider: string; apiKey: string; model: string }[],

@@ -123,8 +123,11 @@ export default function AddKeys() {
 
       {keys.length > 0 && (
         <div style={{ marginBottom: "1rem" }}>
-          <p style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
+          <p style={{ fontWeight: 600, marginBottom: "0.25rem" }}>
             Saved keys ({keys.length}):
+          </p>
+          <p className="muted" style={{ marginTop: 0, marginBottom: "0.75rem", fontSize: "0.85rem" }}>
+            These keys are shared across all your agents — no need to add them again.
           </p>
           <ul style={{ listStyle: "none", padding: 0, margin: "0 0 1rem" }}>
             {keys.map((k) => (

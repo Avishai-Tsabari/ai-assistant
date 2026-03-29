@@ -37,7 +37,7 @@ export default function SignUpPage() {
       setError("Account created but sign-in failed — try signing in.");
       return;
     }
-    router.push("/auth/redirect");
+    router.replace("/auth/redirect");
   }
 
   return (
