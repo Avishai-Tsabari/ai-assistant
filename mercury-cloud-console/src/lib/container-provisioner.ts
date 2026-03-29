@@ -10,6 +10,7 @@ import type { ProvisionProgress, ProvisionRequest } from "@/lib/provisioner";
 import { renderMercuryEnvRecord } from "@/lib/env-renderer";
 import { selectNode } from "@/lib/node-scheduler";
 import { NodeClient } from "@/lib/node-client";
+import { TIER_RESOURCES } from "@/lib/tiers";
 import {
   getDb,
   agents as agentsTable,
@@ -53,9 +54,10 @@ export async function* provisionAgentContainer(
   req: ProvisionRequest,
 ): AsyncGenerator<ProvisionProgress> {
   const masterKey = getMasterKey();
+  const tier = req.tier ?? "standard";
   const agentImage =
     process.env.MERCURY_AGENT_IMAGE ??
-    "ghcr.io/michaelliv/mercury-agent:latest";
+    "ghcr.io/avishai-tsabari/mercury-agent:latest";
   const baseDomain = process.env.NODE_AGENT_BASE_DOMAIN ?? "mercury.app";
 
   // ─── 1. Select compute node ───────────────────────────────────────────
@@ -103,10 +105,13 @@ export async function* provisionAgentContainer(
 
   let containerId: string;
   try {
+    const { memoryMb, cpus } = TIER_RESOURCES[tier];
     const result = await client.startContainer({
       agentId,
       image: agentImage,
       env,
+      memoryMb,
+      cpus,
     });
     containerId = result.containerId;
   } catch (err) {
@@ -158,6 +163,7 @@ export async function* provisionAgentContainer(
         containerId,
         containerStatus: "running",
         imageTag,
+        tier,
         dashboardUrl,
         healthUrl,
         apiSecretCipher,

@@ -2,14 +2,16 @@
 
 import { createContext, useContext, useReducer, type Dispatch } from "react";
 import type { WizardState, ModelChainLeg } from "@/lib/wizard-types";
+import type { AgentTier } from "@/lib/tiers";
 import Welcome from "./steps/Welcome";
 import AddKeys from "./steps/AddKeys";
 import ModelChain from "./steps/ModelChain";
 import Extensions from "./steps/Extensions";
+import PlanTier from "./steps/PlanTier";
 import Provision from "./steps/Provision";
 import Success from "./steps/Success";
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 7;
 
 export type WizardAction =
   | { type: "NEXT_STEP" }
@@ -18,6 +20,7 @@ export type WizardAction =
   | { type: "SET_KEYS"; keys: WizardState["providerKeys"] }
   | { type: "SET_MODEL_CHAIN"; modelChain: ModelChainLeg[] }
   | { type: "SET_EXTENSION_IDS"; extensionIds: string[] }
+  | { type: "SET_TIER"; tier: AgentTier }
   | { type: "SET_OPTIONAL_ENV"; optionalEnv: Record<string, string> }
   | { type: "RESET" };
 
@@ -26,6 +29,7 @@ const initialState: WizardState = {
   providerKeys: [],
   modelChain: [],
   extensionIds: [],
+  tier: "standard",
   optionalEnv: {},
 };
 
@@ -43,6 +47,8 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
       return { ...state, modelChain: action.modelChain };
     case "SET_EXTENSION_IDS":
       return { ...state, extensionIds: action.extensionIds };
+    case "SET_TIER":
+      return { ...state, tier: action.tier };
     case "SET_OPTIONAL_ENV":
       return { ...state, optionalEnv: action.optionalEnv };
     case "RESET":
@@ -70,6 +76,7 @@ const STEP_LABELS = [
   "Add Keys",
   "Model Chain",
   "Extensions",
+  "Plan",
   "Provision",
   "Done",
 ];
@@ -82,6 +89,7 @@ export default function WizardClient() {
     <AddKeys key="addkeys" />,
     <ModelChain key="modelchain" />,
     <Extensions key="extensions" />,
+    <PlanTier key="plantier" />,
     <Provision key="provision" />,
     <Success key="success" />,
   ];

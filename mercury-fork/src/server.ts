@@ -188,6 +188,8 @@ export function createApp(ctx: ServerContext): Hono {
     packageRoot,
     apiSecret: config.apiSecret,
     db: core.db,
+    spacesDir: config.spacesDir,
+    dbPath: config.dbPath,
   });
   app.route("/api/console", consoleApp);
 

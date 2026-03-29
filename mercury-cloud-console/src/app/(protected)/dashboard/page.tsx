@@ -48,6 +48,7 @@ export default async function DashboardPage() {
                   nodeId: a.nodeId,
                   containerStatus: a.containerStatus as "running" | "stopped" | "restarting" | "failed" | null,
                   deprovisionedAt: a.deprovisionedAt,
+                  healthUrl: a.healthUrl,
                 }}
               />
             ))}

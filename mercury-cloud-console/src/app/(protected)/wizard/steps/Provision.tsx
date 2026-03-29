@@ -34,6 +34,7 @@ export default function Provision() {
             model: leg.model,
           })),
           extensionIds: state.extensionIds,
+          tier: state.tier,
           optionalEnv: state.optionalEnv,
         };
 
@@ -184,7 +185,7 @@ export default function Provision() {
           <button
             type="button"
             onClick={() => {
-              dispatch({ type: "SET_STEP", step: 3 });
+              dispatch({ type: "SET_STEP", step: 4 });
             }}
           >
             ← Try Again

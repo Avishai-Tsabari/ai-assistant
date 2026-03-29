@@ -132,7 +132,7 @@ async function main() {
     join(process.cwd(), "data", "agents.json");
   const agentImage =
     process.env.MERCURY_AGENT_IMAGE ??
-    "ghcr.io/michaelliv/mercury-agent:latest";
+    "ghcr.io/avishai-tsabari/mercury-agent:latest";
   const ghcrToken = process.env.GHCR_TOKEN;
   const ghcrUsername = process.env.GHCR_USERNAME;
 

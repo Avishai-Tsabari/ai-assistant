@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { fmtBytes } from "@/lib/format";
 
 type ContainerStatus = "running" | "stopped" | "restarting" | "failed" | null;
 
@@ -13,6 +14,7 @@ interface Agent {
   nodeId: string | null;
   containerStatus: ContainerStatus;
   deprovisionedAt: string | null;
+  healthUrl: string | null;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -43,12 +45,37 @@ function StatusBadge({ status }: { status: ContainerStatus }) {
   );
 }
 
+function DiskBadge({ usedPercent, freeBytes }: { usedPercent: number; freeBytes: number }) {
+  const color =
+    usedPercent > 90 ? "#f85149" : usedPercent > 75 ? "#d29922" : "#8b949e";
+  return (
+    <span style={{ fontSize: "0.75rem", color, marginLeft: "0.5rem" }}>
+      {usedPercent.toFixed(0)}% used · {fmtBytes(freeBytes)} free
+    </span>
+  );
+}
+
 export default function AgentCard({ agent }: { agent: Agent }) {
   const [status, setStatus] = useState<ContainerStatus>(agent.containerStatus);
   const [loading, setLoading] = useState<"stop" | "restart" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [disk, setDisk] = useState<{ usedPercent: number; freeBytes: number } | null>(null);
 
   const isContainer = Boolean(agent.nodeId);
+
+  useEffect(() => {
+    if (!agent.healthUrl) return;
+    const ac = new AbortController();
+    fetch(`/api/user/agents/${agent.id}/storage`, { signal: ac.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { disk?: { usedPercent: number; freeBytes: number } } | null) => {
+        if (d?.disk) {
+          setDisk({ usedPercent: d.disk.usedPercent, freeBytes: d.disk.freeBytes });
+        }
+      })
+      .catch(() => null);
+    return () => ac.abort();
+  }, [agent.id, agent.healthUrl]);
 
   async function handleAction(action: "stop" | "restart") {
     setLoading(action);
@@ -101,6 +128,7 @@ export default function AgentCard({ agent }: { agent: Agent }) {
               {agent.ipv4}
             </span>
           )}
+          {disk && <DiskBadge usedPercent={disk.usedPercent} freeBytes={disk.freeBytes} />}
         </div>
 
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>

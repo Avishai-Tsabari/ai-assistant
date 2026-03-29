@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import type { AgentTier } from "@/lib/tiers";
 import { eq } from "drizzle-orm";
 import {
   buildCloudInitUserData,
@@ -44,6 +45,7 @@ export type ProvisionRequest = {
   modelChain: ModelChainEntry[];
   extensionIds: string[];
   extensionsRepo?: string;
+  tier?: AgentTier;
   optionalEnv?: Record<string, string>;
 };
 
@@ -103,7 +105,7 @@ export async function* provisionAgent(
     .filter((n) => Number.isFinite(n));
   const dnsZoneId = process.env.HETZNER_DNS_ZONE_ID;
   const agentImage =
-    process.env.MERCURY_AGENT_IMAGE ?? "ghcr.io/michaelliv/mercury-agent:latest";
+    process.env.MERCURY_AGENT_IMAGE ?? "ghcr.io/avishai-tsabari/mercury-agent:latest";
   const ghcrToken = process.env.GHCR_TOKEN;
   const ghcrUsername = process.env.GHCR_USERNAME;
   const masterKey = getMasterKey();

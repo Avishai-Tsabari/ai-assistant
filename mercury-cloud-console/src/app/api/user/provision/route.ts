@@ -8,6 +8,7 @@ import { decryptSecret, encryptSecret, getMasterKey } from "@/lib/encryption";
 import { provisionAgent } from "@/lib/provisioner";
 import { provisionAgentContainer } from "@/lib/container-provisioner";
 import { oauthEnvVar } from "@/lib/providers";
+import { TIER_VALUES } from "@/lib/tiers";
 import { refreshOAuthCredentials, type OAuthCredentials } from "@/lib/oauth";
 
 export const runtime = "nodejs";
@@ -24,6 +25,7 @@ const BodySchema = z.object({
   hostname: z.string().max(64).regex(/^[a-z0-9-]*$/, "Hostname must be lowercase letters, numbers, and hyphens").optional().default(""),
   modelChain: z.array(ModelChainLegSchema).min(1),
   extensionIds: z.array(z.string()).optional().default([]),
+  tier: z.enum(TIER_VALUES).optional().default("standard"),
   optionalEnv: z.record(z.string(), z.string()).optional().default({}),
 }).refine(
   (data) => {
@@ -50,7 +52,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { hostname, modelChain, extensionIds, optionalEnv } = parsed.data;
+  const { hostname, modelChain, extensionIds, tier, optionalEnv } = parsed.data;
 
   const masterKey = getMasterKey();
   if (!masterKey) {
@@ -150,6 +152,7 @@ export async function POST(request: Request) {
               hostname,
               modelChain: resolvedChain,
               extensionIds,
+              tier,
               optionalEnv,
             })
           : provisionAgent({
@@ -157,6 +160,7 @@ export async function POST(request: Request) {
               hostname,
               modelChain: resolvedChain,
               extensionIds,
+              tier,
               optionalEnv,
             });
 

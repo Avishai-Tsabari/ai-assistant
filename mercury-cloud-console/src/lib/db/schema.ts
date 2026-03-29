@@ -76,6 +76,8 @@ export const agents = sqliteTable("agents", {
    * References provider_keys.id for each leg of the model chain.
    */
   modelChainConfig: text("model_chain_config"),
+  /** Compute tier — determines container memory + CPU limits */
+  tier: text("tier", { enum: ["starter", "standard", "pro"] }).notNull().default("standard"),
   deprovisionedAt: text("deprovisioned_at"),
   createdAt: text("created_at").notNull(),
 });

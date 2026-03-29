@@ -14,6 +14,7 @@ import {
   resolveExamplesExtensionDir,
 } from "../../extensions/installer.js";
 import type { Db } from "../../storage/db.js";
+import { ensureSpacesDirExists, getStorageInfo } from "./storage.js";
 
 /* ── Adapter configuration helpers ──────────────────────────────── */
 
@@ -124,8 +125,12 @@ export function createConsoleApp(opts: {
   packageRoot: string;
   apiSecret: string | undefined;
   db?: Db;
+  spacesDir: string;
+  dbPath: string;
 }): Hono {
   const app = new Hono();
+
+  ensureSpacesDirExists(opts.spacesDir);
 
   app.use("*", async (c, next) => {
     if (!opts.apiSecret) {
@@ -339,6 +344,14 @@ export function createConsoleApp(opts: {
       lastUsedAt: row.lastUsedAt ?? null,
     }));
     return c.json({ totals, perSpace });
+  });
+
+  app.get("/storage", async (c) => {
+    const info = await getStorageInfo({
+      spacesDir: opts.spacesDir,
+      dbPath: opts.dbPath,
+    });
+    return c.json(info);
   });
 
   return app;

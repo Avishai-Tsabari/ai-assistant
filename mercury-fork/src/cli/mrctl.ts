@@ -2,11 +2,19 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import type { StorageResponse } from "../core/routes/storage.js";
 
 const API_URL = process.env.API_URL;
 const CALLER_ID = process.env.CALLER_ID;
 const SPACE_ID = process.env.SPACE_ID;
 const API_SECRET = process.env.API_SECRET;
+
+function fmtBytes(bytes: number): string {
+  if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(1)} GB`;
+  if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(1)} MB`;
+  if (bytes >= 1_024) return `${(bytes / 1_024).toFixed(1)} KB`;
+  return `${bytes} B`;
+}
 
 function fatal(msg: string): never {
   process.stderr.write(`error: ${msg}\n`);
@@ -71,6 +79,7 @@ Built-in commands:
   mrctl tradestation order --account <id> --symbol <sym> --quantity <n> \\
       --action BUY|SELL|... [--type Market] [--duration DAY] [--route Intelligent] \\
       [--limit-price p] [--stop-price p] [--expiration-date d] [--confirm] [--pending-id uuid]
+  mrctl disk [--json]
   mrctl stop
   mrctl compact
   mrctl recall <search text> [--limit N]
@@ -527,6 +536,34 @@ async function main() {
       process.stderr.write(
         `Wrote ${String(data.sizeBytes ?? "?")} bytes → ${resolvedOut} (${data.mimeType ?? "audio"})\n`,
       );
+      break;
+    }
+
+    case "disk": {
+      const jsonFlag = args.includes("--json");
+      const data = (await api(
+        "GET",
+        "/api/console/storage",
+      )) as StorageResponse;
+
+      if (jsonFlag) {
+        print(data);
+        break;
+      }
+
+      const { disk, spaces, databaseBytes } = data;
+      process.stdout.write(
+        `Disk: ${fmtBytes(disk.totalBytes)} total · ${fmtBytes(disk.usedBytes)} used (${disk.usedPercent.toFixed(1)}%) · ${fmtBytes(disk.freeBytes)} free\n`,
+      );
+      if (spaces.length > 0) {
+        process.stdout.write("\nSpaces:\n");
+        for (const s of spaces) {
+          process.stdout.write(
+            `  ${s.spaceId.padEnd(14)} inbox: ${fmtBytes(s.inboxBytes).padStart(8)}   outbox: ${fmtBytes(s.outboxBytes).padStart(8)}   total: ${fmtBytes(s.totalBytes)}\n`,
+          );
+        }
+      }
+      process.stdout.write(`\nDatabase: ${fmtBytes(databaseBytes)}\n`);
       break;
     }
 

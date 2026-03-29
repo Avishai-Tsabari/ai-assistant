@@ -90,6 +90,42 @@ export async function configureAgentAdapters(opts: {
   return { ok: true };
 }
 
+/* ── Storage ─────────────────────────────────────────────────── */
+
+export type SpaceStorageInfo = {
+  spaceId: string;
+  inboxBytes: number;
+  outboxBytes: number;
+  totalBytes: number;
+};
+
+export type StorageResponse = {
+  disk: {
+    totalBytes: number;
+    usedBytes: number;
+    freeBytes: number;
+    usedPercent: number;
+  };
+  spaces: SpaceStorageInfo[];
+  databaseBytes: number;
+};
+
+export async function fetchAgentStorage(opts: {
+  agentBaseUrl: string;
+  apiSecret: string;
+  signal?: AbortSignal;
+}): Promise<StorageResponse> {
+  const url = `${opts.agentBaseUrl.replace(/\/+$/, "")}/api/console/storage`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${opts.apiSecret}` },
+    signal: opts.signal,
+  });
+  if (!res.ok) {
+    throw new Error(`Storage fetch failed: ${res.status}`);
+  }
+  return (await res.json()) as StorageResponse;
+}
+
 /* ── Extensions ──────────────────────────────────────────────── */
 
 export async function installExtensionOnAgent(opts: {
