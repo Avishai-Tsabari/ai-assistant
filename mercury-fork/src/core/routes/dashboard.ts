@@ -327,6 +327,74 @@ export function createDashboardRoutes(ctx: DashboardContext) {
     `;
   }
 
+  function renderContextPanel(
+    spaceId: string,
+    spacePageReload: string,
+  ): string {
+    const contextMode =
+      core.db.getSpaceConfig(spaceId, "context.mode") ?? "clear";
+    const chainDepthStr =
+      core.db.getSpaceConfig(spaceId, "context.reply_chain_depth") ?? "10";
+
+    const hasOverride = (key: string) =>
+      core.db.getSpaceConfig(spaceId, key) !== null;
+
+    const resetBtn = (key: string) =>
+      hasOverride(key)
+        ? `<button type="button" class="btn btn-sm" title="Use default"
+             hx-delete="/dashboard/api/space-config?spaceId=${encodeURIComponent(spaceId)}&key=${encodeURIComponent(key)}"
+             hx-swap="none"
+             hx-on::after-request="${spacePageReload}">Reset</button>`
+        : "";
+
+    const sid = escapeHtml(spaceId);
+
+    const row = (
+      label: string,
+      key: string,
+      bodyHtml: string,
+    ) => `<div class="role-row" style="flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px">
+      <span style="min-width:160px;font-weight:500">${escapeHtml(label)}</span>
+      ${bodyHtml}
+      ${resetBtn(key)}
+    </div>`;
+
+    const modeForm = `
+      <form style="display:flex;gap:8px;align-items:center;flex:1;flex-wrap:wrap" class="trigger-cfg-form"
+            hx-post="/dashboard/api/space-config" hx-swap="none" hx-on::after-request="${spacePageReload}">
+        <input type="hidden" name="spaceId" value="${sid}" />
+        <input type="hidden" name="key" value="context.mode" />
+        <select name="value" class="select" required>
+          <option value="clear"${contextMode === "clear" ? " selected" : ""}>clear</option>
+          <option value="context"${contextMode === "context" ? " selected" : ""}>context</option>
+        </select>
+        <button type="submit" class="btn btn-sm">Save</button>
+      </form>`;
+
+    const depthForm = `
+      <form style="display:flex;gap:8px;align-items:center;flex:1;flex-wrap:wrap" class="trigger-cfg-form"
+            hx-post="/dashboard/api/space-config" hx-swap="none" hx-on::after-request="${spacePageReload}">
+        <input type="hidden" name="spaceId" value="${sid}" />
+        <input type="hidden" name="key" value="context.reply_chain_depth" />
+        <input type="number" name="value" class="select" value="${escapeHtml(chainDepthStr)}" min="1" max="50" required style="width:80px" />
+        <button type="submit" class="btn btn-sm">Save</button>
+      </form>`;
+
+    return `
+      <p class="muted" style="margin-bottom:10px;line-height:1.5">
+        <strong>clear</strong> = each message starts fresh; reply to bot for chain context.
+        <strong>context</strong> = sliding window of recent turns.
+      </p>
+      <p class="muted" style="margin-bottom:16px;line-height:1.5;font-size:0.92em">
+        <strong>Effective</strong> for this space:
+        <span class="mono">mode=${escapeHtml(contextMode)}</span>,
+        <span class="mono">reply_chain_depth=${escapeHtml(chainDepthStr)}</span>
+      </p>
+      ${row("context.mode", "context.mode", modeForm)}
+      ${row("context.reply_chain_depth", "context.reply_chain_depth", depthForm)}
+    `;
+  }
+
   function renderModelBlock(cfg: AppConfig): string {
     const legs = cfg.resolvedModelChain;
     if (legs.length === 0) {
@@ -969,6 +1037,8 @@ export function createDashboardRoutes(ctx: DashboardContext) {
       spacePageReload,
     );
 
+    const contextHtml = renderContextPanel(spaceId, spacePageReload);
+
     const configHtml =
       configEntriesFiltered.length > 0
         ? configEntriesFiltered
@@ -1039,6 +1109,11 @@ export function createDashboardRoutes(ctx: DashboardContext) {
       <div class="panel">
         <div class="panel-header">Triggers & ambient</div>
         <div class="panel-body">${raw(triggersAmbientHtml)}</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">Context</div>
+        <div class="panel-body">${raw(contextHtml)}</div>
       </div>
 
       <div class="grid-2">

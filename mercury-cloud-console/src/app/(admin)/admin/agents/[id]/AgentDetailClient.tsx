@@ -524,8 +524,13 @@ function SpacesCard({ agentId }: { agentId: string }) {
   const [spaces, setSpaces] = useState<SpaceWithConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState<string | null>(null); // spaceId currently saving
+  const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Local edits keyed by `${spaceId}:${configKey}`
+  const [edits, setEdits] = useState<Record<string, string>>({});
 
   const fetchSpaces = useCallback(async () => {
     setLoading(true);
@@ -539,6 +544,7 @@ function SpacesCard({ agentId }: { agentId: string }) {
       }
       const data = await res.json();
       setSpaces(data.spaces ?? []);
+      setEdits({});
     } catch {
       setError("Failed to fetch spaces");
     } finally {
@@ -550,37 +556,119 @@ function SpacesCard({ agentId }: { agentId: string }) {
     fetchSpaces();
   }, [fetchSpaces]);
 
-  const handleConfigChange = async (spaceId: string, key: string, value: string) => {
-    setSaving(spaceId);
-    setSaveError(null);
-    try {
-      const res = await fetch(`/api/admin/agents/${agentId}/spaces`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spaceId, key, value }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setSaveError(data.error ?? `HTTP ${res.status}`);
-        setSaving(null);
-        return;
+  const getEditValue = (spaceId: string, key: string, fallback: string) => {
+    const editKey = `${spaceId}:${key}`;
+    return editKey in edits ? edits[editKey] : fallback;
+  };
+
+  const setEditValue = (spaceId: string, key: string, value: string) => {
+    setEdits((prev) => ({ ...prev, [`${spaceId}:${key}`]: value }));
+  };
+
+  // Check if any edits differ from remote state
+  const hasChanges = spaces.some((space) => {
+    const modeKey = `${space.id}:context.mode`;
+    const depthKey = `${space.id}:context.reply_chain_depth`;
+    const remoteMode = space.config["context.mode"] ?? "clear";
+    const remoteDepth = space.config["context.reply_chain_depth"] ?? "10";
+    return (
+      (modeKey in edits && edits[modeKey] !== remoteMode) ||
+      (depthKey in edits && edits[depthKey] !== remoteDepth)
+    );
+  });
+
+  const handleSave = async () => {
+    // Validate chain depth values before saving
+    for (const space of spaces) {
+      const depthKey = `${space.id}:context.reply_chain_depth`;
+      if (depthKey in edits) {
+        const num = parseInt(edits[depthKey], 10);
+        if (isNaN(num) || num < 1 || num > 50) {
+          setSaveError(`Reply chain depth for "${space.name || space.id}" must be 1-50`);
+          return;
+        }
       }
-      // Update local state
+    }
+
+    setSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+
+    // Collect changed keys per space
+    const changes: { spaceId: string; key: string; value: string }[] = [];
+    for (const space of spaces) {
+      for (const configKey of ["context.mode", "context.reply_chain_depth"] as const) {
+        const editKey = `${space.id}:${configKey}`;
+        if (!(editKey in edits)) continue;
+        const remote = space.config[configKey] ?? (configKey === "context.mode" ? "clear" : "10");
+        if (edits[editKey] !== remote) {
+          changes.push({ spaceId: space.id, key: configKey, value: edits[editKey] });
+        }
+      }
+    }
+
+    try {
+      for (const change of changes) {
+        const res = await fetch(`/api/admin/agents/${agentId}/spaces`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(change),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setSaveError(data.error ?? `HTTP ${res.status}`);
+          setSaving(false);
+          return;
+        }
+      }
+      // Commit edits into local spaces state
       setSpaces((prev) =>
-        prev.map((s) =>
-          s.id === spaceId ? { ...s, config: { ...s.config, [key]: value } } : s,
-        ),
+        prev.map((s) => {
+          const updated = { ...s.config };
+          for (const change of changes) {
+            if (change.spaceId === s.id) updated[change.key] = change.value;
+          }
+          return { ...s, config: updated };
+        }),
       );
+      setEdits({});
+      setSaveSuccess(true);
+      clearTimeout(successTimerRef.current);
+      successTimerRef.current = setTimeout(() => setSaveSuccess(false), 3000);
     } catch {
       setSaveError("Failed to save");
     } finally {
-      setSaving(null);
+      setSaving(false);
     }
   };
 
   return (
     <div className="card" style={{ marginBottom: "1rem" }}>
-      <h3 style={{ marginTop: 0 }}>Spaces</h3>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h3 style={{ marginTop: 0 }}>Spaces</h3>
+        {!loading && !error && spaces.length > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            {saveSuccess && (
+              <span style={{ color: "#3fb950", fontSize: "0.85rem" }}>Saved</span>
+            )}
+            <button
+              onClick={handleSave}
+              disabled={saving || !hasChanges}
+              style={{
+                background: hasChanges ? "var(--accent)" : "var(--border)",
+                color: hasChanges ? "#0d1117" : "var(--text)",
+                fontWeight: 600,
+                fontSize: "0.85rem",
+                padding: "0.4rem 1rem",
+                borderRadius: "6px",
+                opacity: hasChanges ? 1 : 0.5,
+              }}
+            >
+              {saving ? "Saving..." : "Save"}
+            </button>
+          </div>
+        )}
+      </div>
 
       {saveError && (
         <p style={{ color: "#f85149", fontSize: "0.85rem", margin: "0.5rem 0" }}>
@@ -602,9 +690,8 @@ function SpacesCard({ agentId }: { agentId: string }) {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "0.5rem" }}>
           {spaces.map((space) => {
-            const contextMode = space.config["context.mode"] ?? "clear";
-            const chainDepth = space.config["context.reply_chain_depth"] ?? "10";
-            const isSaving = saving === space.id;
+            const contextMode = getEditValue(space.id, "context.mode", space.config["context.mode"] ?? "clear");
+            const chainDepth = getEditValue(space.id, "context.reply_chain_depth", space.config["context.reply_chain_depth"] ?? "10");
 
             return (
               <div
@@ -613,7 +700,7 @@ function SpacesCard({ agentId }: { agentId: string }) {
                   border: "1px solid var(--border)",
                   borderRadius: "6px",
                   padding: "0.75rem",
-                  opacity: isSaving ? 0.6 : 1,
+                  opacity: saving ? 0.6 : 1,
                 }}
               >
                 <strong style={{ fontSize: "0.9rem" }}>{space.name || space.id}</strong>
@@ -633,8 +720,8 @@ function SpacesCard({ agentId }: { agentId: string }) {
                     </label>
                     <select
                       value={contextMode}
-                      onChange={(e) => handleConfigChange(space.id, "context.mode", e.target.value)}
-                      disabled={isSaving}
+                      onChange={(e) => setEditValue(space.id, "context.mode", e.target.value)}
+                      disabled={saving}
                       style={{
                         padding: "0.35rem 0.5rem",
                         fontSize: "0.85rem",
@@ -661,14 +748,8 @@ function SpacesCard({ agentId }: { agentId: string }) {
                       min={1}
                       max={50}
                       value={chainDepth}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const num = parseInt(val, 10);
-                        if (num >= 1 && num <= 50) {
-                          handleConfigChange(space.id, "context.reply_chain_depth", String(num));
-                        }
-                      }}
-                      disabled={isSaving}
+                      onChange={(e) => setEditValue(space.id, "context.reply_chain_depth", e.target.value)}
+                      disabled={saving}
                       style={{
                         width: "70px",
                         padding: "0.35rem 0.5rem",
@@ -679,6 +760,17 @@ function SpacesCard({ agentId }: { agentId: string }) {
                         color: "var(--text)",
                       }}
                     />
+                    {(() => {
+                      const num = parseInt(chainDepth, 10);
+                      if (chainDepth !== "" && (isNaN(num) || num < 1 || num > 50)) {
+                        return (
+                          <span style={{ color: "#f85149", fontSize: "0.8rem" }}>
+                            Must be 1-50
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 </div>
               </div>
