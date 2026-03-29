@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 
@@ -24,10 +23,8 @@ export type Catalog = {
   extensions: CatalogExtension[];
 };
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
 export function catalogPath(): string {
-  return join(__dirname, "../catalog/extensions.yaml");
+  return join(process.cwd(), "src/catalog/extensions.yaml");
 }
 
 export function loadCatalog(): Catalog {

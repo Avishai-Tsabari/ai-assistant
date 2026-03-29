@@ -10,13 +10,18 @@ export async function GET() {
   const userId = assertUserOrThrow(session);
   if (userId instanceof NextResponse) return userId;
 
-  const catalog = loadCatalog();
-  return NextResponse.json({
-    extensions: catalog.extensions.map((e) => ({
-      id: e.id,
-      display_name: e.display_name,
-      description: e.description,
-      monthly_price_usd: e.monthly_price_usd,
-    })),
-  });
+  try {
+    const catalog = loadCatalog();
+    return NextResponse.json({
+      extensions: catalog.extensions.map((e) => ({
+        id: e.id,
+        display_name: e.display_name,
+        description: e.description,
+        monthly_price_usd: e.monthly_price_usd,
+      })),
+    });
+  } catch (err) {
+    console.error("Failed to load catalog:", err);
+    return NextResponse.json({ error: "Failed to load catalog" }, { status: 500 });
+  }
 }
