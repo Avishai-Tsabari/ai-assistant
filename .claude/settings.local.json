@@ -141,7 +141,9 @@
       "Bash(bunx biome:*)",
       "Bash(grep -r \"formatBytes\\\\|fmtBytes\\\\|bytes.*GB\\\\|bytes.*MB\" C:codeagenticmercurymercury-cloud-consolesrc C:codeagenticmercurymercury-forksrc --include=*.ts --include=*.tsx -l)",
       "Bash(head -70 /c/code/agentic/mercury/mercury-cloud-console/src/app/\\\\\\(protected\\\\\\)/dashboard/AgentCard.tsx)",
-      "WebFetch(domain:puvvadi.net)"
+      "WebFetch(domain:puvvadi.net)",
+      "Bash(find \"C:\\\\code\\\\agentic\\\\mercury\\\\mercury-cloud-console\\\\src\\\\app\\\\\\(protected\\)\" -type f -name \"*.tsx\")",
+      "Bash(git commit:*)"
     ]
   }
 }

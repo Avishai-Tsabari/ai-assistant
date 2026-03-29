@@ -27,7 +27,6 @@ services:
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - letsencrypt:/letsencrypt
     environment:
-      - HETZNER_API_KEY=${HETZNER_DNS_API_TOKEN}
       - ACME_EMAIL=${ACME_EMAIL}
     networks:
       - mercury-net
