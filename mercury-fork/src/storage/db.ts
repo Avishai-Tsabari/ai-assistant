@@ -40,6 +40,7 @@ type MessageRow = {
   content: string;
   attachments: string | null;
   runMeta: string | null;
+  replyToId: number | null;
   createdAt: number;
   updatedAt: number;
 };
@@ -182,9 +183,23 @@ export class Db {
 
       CREATE INDEX IF NOT EXISTS idx_token_usage_space
       ON token_usage(space_id, created_at);
+
+      CREATE TABLE IF NOT EXISTS message_platform_ids (
+        mercury_message_id INTEGER NOT NULL,
+        platform TEXT NOT NULL,
+        conversation_external_id TEXT NOT NULL,
+        platform_message_id TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (platform, conversation_external_id, platform_message_id),
+        FOREIGN KEY (mercury_message_id) REFERENCES messages(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_mpi_mercury_id
+      ON message_platform_ids(mercury_message_id);
     `);
     this.ensureMessagesRunMetaColumn();
     this.ensureChatStateClearBoundaryColumn();
+    this.ensureMessagesReplyToIdColumn();
   }
 
   private ensureMessagesRunMetaColumn(): void {
@@ -202,6 +217,16 @@ export class Db {
     if (cols.some((c) => c.name === "clear_boundary")) return;
     this.db.exec(
       "ALTER TABLE chat_state ADD COLUMN clear_boundary INTEGER NOT NULL DEFAULT 0",
+    );
+  }
+
+  private ensureMessagesReplyToIdColumn(): void {
+    const cols = this.db.query("PRAGMA table_info(messages)").all() as {
+      name: string;
+    }[];
+    if (cols.some((c) => c.name === "reply_to_id")) return;
+    this.db.exec(
+      "ALTER TABLE messages ADD COLUMN reply_to_id INTEGER REFERENCES messages(id)",
     );
   }
 

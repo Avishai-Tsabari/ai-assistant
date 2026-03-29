@@ -10,6 +10,7 @@ const PatchNodeSchema = z.object({
   status: z.enum(["active", "draining", "offline"]).optional(),
   maxAgents: z.number().int().min(1).max(500).optional(),
   label: z.string().min(1).max(80).optional(),
+  apiToken: z.string().min(8).optional(),
 });
 
 /** GET /api/admin/nodes/[id]/health — live health from a specific node. */

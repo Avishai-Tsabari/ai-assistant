@@ -49,6 +49,8 @@ export interface StoredMessage {
   updatedAt: number;
   /** Set after the agent turn completes for `user` rows */
   runMeta?: MessageRunMeta;
+  /** Mercury message ID this message is a reply to (for reply chain assembly) */
+  replyToId?: number;
 }
 
 export interface ScheduledTask {
@@ -178,6 +180,10 @@ export interface IngressMessage {
    * before normalize (even if nothing was saved — e.g. media off or download failed).
    */
   hadIncomingAttachments?: boolean;
+  /** Platform-native message ID of the message being replied to (if this is a reply) */
+  replyToPlatformMessageId?: string;
+  /** Platform-native message ID of THIS inbound message (for future reply tracking) */
+  platformMessageId?: string;
 }
 
 /**
@@ -263,10 +269,10 @@ export interface PlatformBridge {
 
   // --- Egress ---
 
-  /** Send a reply with optional file attachments */
+  /** Send a reply with optional file attachments. Returns the platform message ID if available. */
   sendReply(
     threadId: string,
     text: string,
     files?: EgressFile[],
-  ): Promise<void>;
+  ): Promise<string | undefined>;
 }

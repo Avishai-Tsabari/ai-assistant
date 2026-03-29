@@ -58,7 +58,7 @@ export async function* provisionAgentContainer(
   const agentImage =
     process.env.MERCURY_AGENT_IMAGE ??
     "ghcr.io/avishai-tsabari/mercury-agent:latest";
-  const baseDomain = process.env.NODE_AGENT_BASE_DOMAIN ?? "mercury.app";
+  const baseDomain = process.env.AGENT_BASE_DOMAIN ?? "mercury.app";
 
   // ─── 1. Select compute node ───────────────────────────────────────────
   yield { type: "progress", message: "Selecting compute node..." };

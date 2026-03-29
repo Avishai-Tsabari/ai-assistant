@@ -55,5 +55,11 @@ cd mercury-cloud-console && bun run build       # Next.js production build
 
 When starting a new feature or non-trivial task:
 
-1. Invoke the `product-planning` skill to produce a PRD and feature spec (outputs to `prds/` or `docs/prd/`)
-2. Use the PRD to drive implementation planning before writing any code
+1. **PRD** (what + why) — Invoke `product-planning` skill → outputs to `prds/`
+   - Covers: problem statement, goals, user stories, acceptance criteria, out-of-scope
+   - No file names, schemas, or implementation detail
+2. **TDD** (how) — After PRD approval, invoke `product-planning` skill in TDD mode → outputs to `tdds/`
+   - Covers: data models, API contracts, file/folder structure, implementation sequence, edge cases
+3. **Implementation** — After TDD approval, begin coding
+
+PRDs are stable. TDDs are mutable — update them if the design changes during implementation.

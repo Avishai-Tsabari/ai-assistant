@@ -58,6 +58,8 @@ export function NodesClient({
   const [loading, setLoading] = useState(false);
   // "register" | "provision" | null
   const [panel, setPanel] = useState<"register" | "provision" | null>(null);
+  const [tokenEdit, setTokenEdit] = useState<{ nodeId: string; value: string; saving: boolean; error: string | null } | null>(null);
+  const [revealedToken, setRevealedToken] = useState<{ nodeId: string; token: string } | null>(null);
 
   // Manual registration state
   const [addError, setAddError] = useState<string | null>(null);
@@ -107,6 +109,36 @@ export function NodesClient({
       body: JSON.stringify({ status }),
     });
     await fetchHealth();
+  };
+
+  const revealToken = async (nodeId: string) => {
+    if (revealedToken?.nodeId === nodeId) {
+      setRevealedToken(null);
+      return;
+    }
+    const res = await fetch(`/api/admin/nodes/${nodeId}/token`);
+    const data = await res.json();
+    if (res.ok) setRevealedToken({ nodeId, token: data.apiToken });
+  };
+
+  const saveToken = async () => {
+    if (!tokenEdit || tokenEdit.value.length < 8) return;
+    setTokenEdit((t) => t && { ...t, saving: true, error: null });
+    try {
+      const res = await fetch(`/api/admin/nodes/${tokenEdit.nodeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiToken: tokenEdit.value }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setTokenEdit((t) => t && { ...t, saving: false, error: data.error ?? "Failed to update token" });
+        return;
+      }
+      setTokenEdit(null);
+    } catch (err) {
+      setTokenEdit((t) => t && { ...t, saving: false, error: err instanceof Error ? err.message : "Unknown error" });
+    }
   };
 
   const deleteNode = async (nodeId: string, label: string) => {
@@ -481,7 +513,7 @@ export function NodesClient({
                 </td>
                 <td style={td} className="muted">{node.maxAgents}</td>
                 <td style={td}>
-                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
                     {node.status !== "active" && (
                       <button style={smallBtn} onClick={() => setStatus(node.id, "active")}>
                         Activate
@@ -496,12 +528,58 @@ export function NodesClient({
                       </button>
                     )}
                     <button
+                      style={smallBtn}
+                      onClick={() => revealToken(node.id)}
+                    >
+                      {revealedToken?.nodeId === node.id ? "Hide Token" : "Reveal Token"}
+                    </button>
+                    <button
+                      style={smallBtn}
+                      onClick={() =>
+                        setTokenEdit(tokenEdit?.nodeId === node.id ? null : { nodeId: node.id, value: "", saving: false, error: null })
+                      }
+                    >
+                      {tokenEdit?.nodeId === node.id ? "Cancel" : "Update Token"}
+                    </button>
+                    <button
                       style={{ ...smallBtn, color: "#f85149" }}
                       onClick={() => deleteNode(node.id, node.label)}
                     >
                       Remove
                     </button>
                   </div>
+                  {revealedToken?.nodeId === node.id && (
+                    <div style={{ marginTop: "0.5rem", display: "flex", gap: "0.4rem", alignItems: "center" }}>
+                      <code style={{ fontSize: "0.75rem", background: "#0d1117", padding: "0.2rem 0.5rem", borderRadius: 4, border: "1px solid var(--border)", userSelect: "all" }}>
+                        {revealedToken.token}
+                      </code>
+                      <button style={smallBtn} onClick={() => navigator.clipboard.writeText(revealedToken.token)}>
+                        Copy
+                      </button>
+                    </div>
+                  )}
+                  {tokenEdit?.nodeId === node.id && (
+                    <div style={{ marginTop: "0.5rem", display: "flex", gap: "0.4rem", alignItems: "center" }}>
+                      <input
+                        type="password"
+                        placeholder="new token (min 8 chars)"
+                        value={tokenEdit.value}
+                        onChange={(e) => setTokenEdit((t) => t && { ...t, value: e.target.value })}
+                        style={{ fontSize: "0.8rem", padding: "0.2rem 0.4rem", width: 200 }}
+                        autoFocus
+                      />
+                      <button
+                        style={{ ...smallBtn, color: "#3fb950" }}
+                        onClick={saveToken}
+                        disabled={tokenEdit.saving || tokenEdit.value.length < 8}
+                      >
+                        {tokenEdit.saving ? "Saving…" : "Save"}
+                      </button>
+                      {tokenEdit.error && (
+                        <span style={{ color: "#f85149", fontSize: "0.8rem" }}>{tokenEdit.error}</span>
+                      )}
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
