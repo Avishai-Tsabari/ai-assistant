@@ -79,9 +79,11 @@ Built-in commands:
   mrctl tradestation order --account <id> --symbol <sym> --quantity <n> \\
       --action BUY|SELL|... [--type Market] [--duration DAY] [--route Intelligent] \\
       [--limit-price p] [--stop-price p] [--expiration-date d] [--confirm] [--pending-id uuid]
+  mrctl media clear [--inbox] [--outbox]
   mrctl disk [--json]
   mrctl stop
   mrctl compact
+  mrctl clear
   mrctl recall <search text> [--limit N]
   mrctl tts synthesize --text "Hello" --out outbox/reply.mp3 \\
       [--language auto|he-IL|en-US] [--provider google|azure|auto]
@@ -449,6 +451,11 @@ async function main() {
       break;
     }
 
+    case "clear": {
+      print(await api("POST", "/api/clear"));
+      break;
+    }
+
     case "recall": {
       let end = args.length;
       const li = args.indexOf("--limit");
@@ -536,6 +543,21 @@ async function main() {
       process.stderr.write(
         `Wrote ${String(data.sizeBytes ?? "?")} bytes → ${resolvedOut} (${data.mimeType ?? "audio"})\n`,
       );
+      break;
+    }
+
+    case "media": {
+      if (sub !== "clear") {
+        fatal("Expected: mrctl media clear [--inbox] [--outbox]");
+      }
+      const inboxFlag = args.includes("--inbox");
+      const outboxFlag = args.includes("--outbox");
+      const body: Record<string, boolean> = {};
+      if (inboxFlag || outboxFlag) {
+        body.inbox = inboxFlag;
+        body.outbox = outboxFlag;
+      }
+      print(await api("POST", "/api/media/purge", body));
       break;
     }
 

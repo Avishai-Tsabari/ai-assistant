@@ -7,6 +7,7 @@ import {
   control,
   conversations,
   extensions,
+  media,
   messages,
   mutes,
   permissions,
@@ -82,6 +83,7 @@ export function createApiApp(apiCtx: ApiContext): Hono<Env> {
   app.route("/permissions", permissions);
   app.route("/spaces", spaces);
   app.route("/conversations", conversations);
+  app.route("/media", media);
   app.route("/messages", messages);
   app.route("/mutes", mutes);
   app.route("/ext", extensions);

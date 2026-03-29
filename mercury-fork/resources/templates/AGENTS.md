@@ -45,7 +45,8 @@ mrctl tasks delete <id>         # Delete a task
 ```bash
 mrctl config get [key]          # Get config (all or specific key)
 mrctl config set <key> <value>  # Set config value
-# Valid keys: trigger.match, trigger.patterns, trigger.case_sensitive
+# Valid keys: trigger.match, trigger.patterns, trigger.case_sensitive,
+#             context.mode (clear|context), context.reply_chain_depth (1-50)
 ```
 
 ### Spaces
@@ -71,7 +72,16 @@ mrctl permissions set <role> <perm1,perm2>   # Set role permissions
 ### Control
 ```bash
 mrctl stop                      # Abort current run, clear queue
-mrctl compact                   # Reset session (fresh context)
+mrctl compact                   # Permanent session reset (old messages excluded forever)
+mrctl clear                     # One-shot clear (next run starts fresh, then reverts)
+```
+
+### Media
+```bash
+mrctl media clear               # Purge inbox + outbox files
+mrctl media clear --inbox       # Purge received files only
+mrctl media clear --outbox      # Purge produced files only
+mrctl disk                      # Show per-space storage breakdown
 ```
 
 ### TradeStation orders (when the tradestation extension is enabled)

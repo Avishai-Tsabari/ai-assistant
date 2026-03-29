@@ -26,6 +26,8 @@ const BUILT_IN_PERMISSIONS = new Set([
   "spaces.list",
   "spaces.rename",
   "spaces.delete",
+  /** Purge inbox/outbox media files. */
+  "media.purge",
   /** Host Text-to-Speech (/api/tts); admin-only by default. */
   "tts.synthesize",
 ]);
