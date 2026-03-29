@@ -143,7 +143,9 @@
       "Bash(head -70 /c/code/agentic/mercury/mercury-cloud-console/src/app/\\\\\\(protected\\\\\\)/dashboard/AgentCard.tsx)",
       "WebFetch(domain:puvvadi.net)",
       "Bash(find \"C:\\\\code\\\\agentic\\\\mercury\\\\mercury-cloud-console\\\\src\\\\app\\\\\\(protected\\)\" -type f -name \"*.tsx\")",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(find C:/code/agentic/mercury/mercury-cloud-console/src/app/auth -name *.tsx -o -name *.ts)",
+      "Bash(find C:/code/agentic/mercury/mercury-cloud-console/src/app -maxdepth 2 -name *.tsx -o -name *.ts)"
     ]
   }
 }

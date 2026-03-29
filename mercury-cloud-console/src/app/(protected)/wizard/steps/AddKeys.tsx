@@ -35,6 +35,7 @@ export default function AddKeys() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [oauthProvider, setOAuthProvider] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const providerOptions = Object.entries(KNOWN_PROVIDERS);
   const selectedMeta = KNOWN_PROVIDERS[provider];
@@ -97,6 +98,16 @@ export default function AddKeys() {
     }
   }
 
+  async function handleDelete(id: string) {
+    setDeleting(id);
+    try {
+      await fetch(`/api/user/keys/${id}`, { method: "DELETE" });
+      setKeys((prev) => prev.filter((k) => k.id !== id));
+    } finally {
+      setDeleting(null);
+    }
+  }
+
   async function handleOAuthConnected(_keyId: string) {
     setOAuthProvider(null);
     // Reload keys from server to pick up the new OAuth key
@@ -153,8 +164,25 @@ export default function AddKeys() {
                     </span>
                   ) : null}
                 </span>
-                <span className="muted" style={{ fontSize: "0.85rem" }}>
-                  {new Date(k.createdAt).toLocaleDateString()}
+                <span style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <span className="muted" style={{ fontSize: "0.85rem" }}>
+                    {new Date(k.createdAt).toLocaleDateString()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(k.id)}
+                    disabled={deleting === k.id}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--error, #e53e3e)",
+                      cursor: "pointer",
+                      padding: "0 0.25rem",
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    {deleting === k.id ? "..." : "Delete"}
+                  </button>
                 </span>
               </li>
             ))}
