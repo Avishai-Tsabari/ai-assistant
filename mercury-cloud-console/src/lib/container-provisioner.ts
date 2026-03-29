@@ -82,6 +82,11 @@ export async function* provisionAgentContainer(
 ): AsyncGenerator<ProvisionProgress> {
   const masterKey = getMasterKey();
   const tier = req.tier ?? "standard";
+  // mercury-host: the outer container running the mercury-fork HTTP server
+  const hostImage =
+    process.env.MERCURY_HOST_IMAGE ??
+    "ghcr.io/avishai-tsabari/mercury-host:latest";
+  // mercury-agent: the inner pi coding-agent image spawned per conversation turn
   const agentImage =
     process.env.MERCURY_AGENT_IMAGE ??
     "ghcr.io/avishai-tsabari/mercury-agent:latest";
@@ -135,7 +140,7 @@ export async function* provisionAgentContainer(
     const { memoryMb, cpus } = TIER_RESOURCES[tier];
     const result = await client.startContainer({
       agentId,
-      image: agentImage,
+      image: hostImage,
       env,
       memoryMb,
       cpus,
@@ -152,7 +157,7 @@ export async function* provisionAgentContainer(
   // ─── 4. Persist to database ───────────────────────────────────────────
   const healthUrl = `https://${agentId}.${baseDomain}`;
   const dashboardUrl = `${healthUrl}/dashboard`;
-  const imageTag = agentImage.split(":").pop() ?? "latest";
+  const imageTag = hostImage.split(":").pop() ?? "latest";
 
   const apiSecretCipher =
     masterKey && masterKey.length > 0

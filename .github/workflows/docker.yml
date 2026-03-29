@@ -34,7 +34,7 @@ jobs:
           echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
           echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
-      - name: Build and push
+      - name: Build and push inner agent image
         uses: docker/build-push-action@v6
         with:
           context: ./mercury-fork
@@ -44,3 +44,14 @@ jobs:
           tags: |
             ghcr.io/${{ steps.meta.outputs.owner }}/mercury-agent:latest
             ghcr.io/${{ steps.meta.outputs.owner }}/mercury-agent:${{ steps.meta.outputs.version }}
+
+      - name: Build and push host image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./mercury-fork
+          file: ./mercury-fork/Dockerfile.host
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/mercury-host:latest
+            ghcr.io/${{ steps.meta.outputs.owner }}/mercury-host:${{ steps.meta.outputs.version }}
